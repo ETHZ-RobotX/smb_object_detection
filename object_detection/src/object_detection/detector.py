@@ -27,6 +27,10 @@ class Detector:
             self.detector.iou = self.iou
             self.detector.classes = self.classes
         elif self.architecture == 'detectron':
+            
+            if self.device == 'cpu':
+                raise rospy.exceptions.ROSInitException("Detectron architecture runs very slow on CPU. Not recommended.")
+
             self.cfg = get_cfg()
             self.cfg.merge_from_file(model_zoo.get_config_file(self.model)) # "COCO-InstanceSegmentation/mask_rcnn_R_50_FPN_3x.yaml"
             self.checkpoint  = self.model
@@ -34,8 +38,6 @@ class Detector:
             self.cfg.MODEL.ROI_HEADS.SCORE_THRESH_TEST = self.iou 
             self.cfg.MODEL.DEVICE = self.device
             self.detector = DefaultPredictor(self.cfg)
-
-            # raise rospy.exceptions.ROSInitException("Detectron architecture was not implemented yet.")
         else:
             raise rospy.exceptions.ROSInitException("Unrecognised architecture.")
 
