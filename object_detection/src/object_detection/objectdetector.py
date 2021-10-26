@@ -1,6 +1,5 @@
 import rospy
 import torch
-import cv2
 
 from detectron2 import model_zoo
 from detectron2.engine import DefaultPredictor
@@ -10,7 +9,7 @@ from detectron2.data import MetadataCatalog, DatasetCatalog
 
 from rospy.exceptions import ROSInitException 
 
-class Detector:
+class ObjectDetector:
     def __init__(self, config):
         self.architecture   = config["architecture"]
         self.model          = config["model"]

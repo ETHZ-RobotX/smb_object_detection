@@ -10,6 +10,7 @@ project(object_detection)
 find_package(catkin REQUIRED COMPONENTS
   roscpp
   rospy
+  ros_numpy
   std_msgs
 )
 
