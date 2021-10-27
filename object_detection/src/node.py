@@ -27,7 +27,7 @@ class Node:
         self.lidar_sub                      = message_filters.Subscriber(self.lidar_topic, PointCloud2)
 
         # TODO: Add self.lidar_sub
-        self.synchronizer                   = message_filters.ApproximateTimeSynchronizer([self.camera_sub, self.lidar_sub], 1, 0.5)
+        self.synchronizer                   = message_filters.ApproximateTimeSynchronizer([self.camera_sub, self.lidar_sub], 1, 0.1, reset=True)
 
         # Detector related
         self.detector_cfg = {}
@@ -57,7 +57,38 @@ class Node:
              [-0.9993,0.0120,0.0334],
              [-0.0123,-0.9998,-0.0103]])
         
-        t = np.float64([0.3956,0.2128,-0.2866])
+        R = np.float64([[0.0,0,1.0],
+             [-1.0,0.0,0.0],
+             [0.0,-1.0,0.0]])
+        
+        a = np.float64([ [0.0000000,  1.0000000,  0.0000000],
+                [-1.0000000,  0.0000000,  0.0000000],
+                    [0.0000000,  0.0000000,  1.0000000] ])
+
+        R = a @ R
+
+        R_lidar_2_camera = np.float64([ [-1.0000000, 0.0000000,  0.0000000],
+                        [0.0000000, -0.0000000, -1.0000000],
+                        [0.0000000, -1.0000000,  0.0000000] ])
+  
+        r_base_2_camera = np.float64([ [0.0000000,  0.0000000,  1.0],
+            [-1.0,  0.0000000,  0.0000000],
+            [0.0000000, -1.0,  0.0000000] ])
+
+        r_base_2_lidar = np.float64([[ -0.0000000, -1.0000000,  0.0000000],
+            [1.0000000, -0.0000000,  0.0000000],
+            [0.0000000,  0.0000000,  1.0000000] ])
+
+
+        # R = np.transpose(r_base_2_lidar)@r_base_2_camera   
+
+        # t = np.transpose( np.float64([0.3956,0.2128,-0.2866]) )
+        t = np.float64([0.29297, -0.04542, -0.2415])
+        # t = np.float64([0,0,0])
+        
+
+
+        # t = r_base_2_camera @ t
         # -------- TODO: REMOVE HARDCODED PARAMS ---------------------------
 
         self.imagehandler.set_cameraparams(K, dist, wh)
@@ -77,10 +108,8 @@ class Node:
                 img_pts = self.imagehandler.projectPoints(point_cloud)
                                 
                 result = self.detector.detect(cv_image)
-
-                print(result.shape)
-
-                result[img_pts[:,0], img_pts[:,1], :] = [255,0,0]
+ 
+                result[img_pts[:,1], img_pts[:,0], :] = [0,0,255]
                 cv2.imshow("result", result)
                 cv2.waitKey(1)
         self.synchronizer.registerCallback(callback)

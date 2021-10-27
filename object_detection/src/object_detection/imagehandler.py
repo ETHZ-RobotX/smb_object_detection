@@ -37,24 +37,20 @@ class ImageHandler:
         return dst
 
     def projectPoints(self, points):
-        print(points.shape)
         
-        front_hemisphere = points[:, 1] > 0 
+        front_hemisphere = points[:, 1] < 0 
         front_hemisphere_indices = np.argwhere(front_hemisphere).flatten()      
         
         points = points[front_hemisphere_indices,:]
-        print(points.shape)
             
         imgPts = cv2.projectPoints(points, self.R, self.t, self.K, self.dist)[0]
         imgPts = np.uint32(np.squeeze(imgPts))
-        print(imgPts.shape)
 
-        inside_frame_x = np.logical_and((imgPts[0] >= 0), (imgPts[0] < self.h))
-        inside_frame_y = np.logical_and((imgPts[1] >= 0), (imgPts[1] < self.w))
+        inside_frame_x = np.logical_and((imgPts[:,0] >= 0), (imgPts[:,0] < self.w))
+        inside_frame_y = np.logical_and((imgPts[:,1] >= 0), (imgPts[:,1] < self.h))
         inside_frame_indices = np.argwhere(np.logical_and(inside_frame_x,inside_frame_y)).flatten()
 
         imgPts = imgPts[inside_frame_indices,:]  
 
-        print(imgPts.shape)
 
         return imgPts
