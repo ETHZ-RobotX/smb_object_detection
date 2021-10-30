@@ -40,9 +40,28 @@ class ObjectDetector:
         else:
             raise rospy.exceptions.ROSInitException("Unrecognised architecture.")
 
-    def detect(self, image):
+    def detect(self, image, return_image = False):
+        """ Detects objects on the given image using set model (YOLO V5 or Detectron) 
+        
+        Args:
+            image        : numpy matrix, RGB or Gray Scale image
+            return_image : bool to decide return image or not 
+        
+        Returns:
+            A list  -> list[0] : object infos in Pandas data frame
+                    -> list[1] : image with bounding boxes
+
+        """
+
         if self.architecture == 'yolo':
-            return self.detector(image).render()[0]
+            output = self.detector(image)
+            if return_image:
+                return [output.pandas().xyxy, output.render()[0] ]
+            
+            else:
+                return [output.pandas().xyxy, None]
+            
+
         elif self.architecture == 'detectron':
             outputs = self.detector(image)
             v = Visualizer(image[:, :, ::-1], MetadataCatalog.get(self.cfg.DATASETS.TRAIN[0]), scale=1.2)

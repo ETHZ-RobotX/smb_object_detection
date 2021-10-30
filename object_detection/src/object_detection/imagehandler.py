@@ -1,3 +1,4 @@
+from PIL.Image import FASTOCTREE
 import numpy as np
 import cv2
 
@@ -23,34 +24,123 @@ class ImageHandler:
                                                               1,
                                                               (self.w,self.h))
 
+        self.P = np.zeros((3,4))
+        self.P[:,:3] = self.new_K
+
     def set_transformationparams(self, R, t):
         self.R = R
         self.t = t
 
+        # T_camera_lidar
+        self.T = np.zeros((4,4))
+        self.T[:3,:3] = R
+        self.T[:3,3] = t
+        self.T[3,3] = 1
+
     def undistort(self, img):
+        
         dst = cv2.undistort(img, self.K, self.dist, None, self.new_K)
         
         #crop the image
         # x,y,w,h = self.roi
         # dst = dst[y:y+h, x:x+w]
+        # 
+        self.w = dst.shape[1]
+        self.h = dst.shape[0]
 
         return dst
+    
+    def __undistortPoints(self, points):
+        dst = cv2.undistortPoints(np.float64(points), self.K, self.dist, self.new_K )
+        return dst
+    
+    def __translatePoints(self, points):
+        """
+        points : nx3 matrix -> X Y Z
 
-    def projectPoints(self, points):
+        return : nx3 matrix -> X Y Z
+        """
+        homo_coor = np.ones(points.shape[0])
+        XYZ = np.vstack((np.transpose(points),homo_coor))
+
+        XYZ = self.T @ XYZ
+        XYZ = XYZ / XYZ[3,:]
+
+        return np.transpose(XYZ[:3,:])
+
+    def __projectPoints(self,points):
+        """
+        points : nx3 matrix -> X Y Z
+
+        return : nx2 matrix -> X Y 
+        """
+        indices = np.arange(0,len(points))
+
+        # Take only front hemisphere points
+        front_hemisphere = points[:, 2] > 0 
+        front_hemisphere_indices = np.argwhere(front_hemisphere).flatten()
+        indices = indices[front_hemisphere_indices]
+
+        points = points[front_hemisphere_indices, :]
+        homo_coor = np.ones(points.shape[0])
+        XYZ = np.vstack((np.transpose(points),homo_coor))
+
+        xy = self.P @ XYZ 
+        xy = xy / xy[2,None] 
+
+        return np.transpose(xy[:2,:]), indices
+
+
+    def projectPoints(self, points, use_cv2=False):
+        
+        if use_cv2:
+            indices = np.arange(0,len(points))
+            front_hemisphere = points[:, 1] < 0 
+            front_hemisphere_indices = np.argwhere(front_hemisphere).flatten()
+            indices = indices[front_hemisphere_indices]
+            points = points[front_hemisphere_indices,:]
+            points_on_image = cv2.projectPoints(points, self.R, self.t, self.K, self.dist)[0]
+            
+        else:
+            translated_points = self.__translatePoints(points)
+            points_on_image, indices = self.__projectPoints(translated_points)
+          
+        points_on_image = np.uint32(np.squeeze(points_on_image))
+        
+        inside_frame_x = np.logical_and((points_on_image[:,0] >= 0), (points_on_image[:,0] < self.w))
+        inside_frame_y = np.logical_and((points_on_image[:,1] >= 0), (points_on_image[:,1] < self.h))
+        inside_frame_indices = np.argwhere(np.logical_and(inside_frame_x,inside_frame_y)).flatten()
+        
+        indices = indices[inside_frame_indices]
+        points_on_image = points_on_image[inside_frame_indices,:]    
+
+        return points_on_image, indices
+
+    def projectPoints2(self, points):
         
         front_hemisphere = points[:, 1] < 0 
-        front_hemisphere_indices = np.argwhere(front_hemisphere).flatten()      
-        
-        points = points[front_hemisphere_indices,:]
+        front_hemisphere_indices = np.argwhere(front_hemisphere).flatten()
+        points_front = points[front_hemisphere_indices,:]
+        points_on_image_cv2 = cv2.projectPoints(points_front, self.R, self.t, self.K, self.dist)[0]
             
-        imgPts = cv2.projectPoints(points, self.R, self.t, self.K, self.dist)[0]
-        imgPts = np.uint32(np.squeeze(imgPts))
-
-        inside_frame_x = np.logical_and((imgPts[:,0] >= 0), (imgPts[:,0] < self.w))
-        inside_frame_y = np.logical_and((imgPts[:,1] >= 0), (imgPts[:,1] < self.h))
+        
+        translated_points = self.__translatePoints(points)
+        points_on_image_classic = self.__projectPoints(translated_points)
+          
+        
+        points_on_image_classic = np.uint32(np.squeeze(points_on_image_classic))
+        inside_frame_x = np.logical_and((points_on_image_classic[:,0] >= 0), (points_on_image_classic[:,0] < self.w))
+        inside_frame_y = np.logical_and((points_on_image_classic[:,1] >= 0), (points_on_image_classic[:,1] < self.h))
         inside_frame_indices = np.argwhere(np.logical_and(inside_frame_x,inside_frame_y)).flatten()
+        points_on_image_classic = points_on_image_classic[inside_frame_indices,:]       
 
-        imgPts = imgPts[inside_frame_indices,:]  
+
+        points_on_image_cv2 = np.uint32(np.squeeze(points_on_image_cv2))
+        inside_frame_x = np.logical_and((points_on_image_cv2[:,0] >= 0), (points_on_image_cv2[:,0] < self.w))
+        inside_frame_y = np.logical_and((points_on_image_cv2[:,1] >= 0), (points_on_image_cv2[:,1] < self.h))
+        inside_frame_indices = np.argwhere(np.logical_and(inside_frame_x,inside_frame_y)).flatten()
+        points_on_image_cv2 = points_on_image_cv2[inside_frame_indices,:]    
+
+        return points_on_image_cv2, points_on_image_classic
 
 
-        return imgPts
