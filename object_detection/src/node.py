@@ -9,29 +9,65 @@ from cv_bridge import CvBridge
 import cv2
 import tf
 
-
-
-
 from object_detection.objectdetector import ObjectDetector
 from object_detection.imagehandler import ImageHandler
+from object_detection.modelextractor import *
+
+
+def hsv2rgb(h, s, v):
+    h = float(h)
+    s = float(s)
+    v = float(v)
+    h60 = h / 50.0
+    h60f = np.floor(h60)
+    hi = int(h60f) % 5
+    f = h60 - h60f
+    p = v * (1 - s)
+    q = v * (1 - f * s)
+    t = v * (1 - (1 - f) * s)
+    r, g, b = 0, 0, 0
+    if hi == 0: r, g, b = v, t, p
+    elif hi == 1: r, g, b = q, v, p
+    elif hi == 2: r, g, b = p, v, t
+    elif hi == 3: r, g, b = p, q, v
+    elif hi == 4: r, g, b = t, p, v
+    elif hi == 5: r, g, b = v, p, q
+    r, g, b = int(r * 255), int(g * 255), int(b * 255)
+    return r, g, b
+
+
+def depth_color(val, min_d=0, max_d=12):
+    """
+    print Color(HSV's H value) corresponding to distance(m)
+    close distance = red , far distance = blue
+    """
+    # np.clip(val, 0, max_d, out=val)
+
+    hsv = (-1*((val - min_d) / (max_d - min_d)) * 255).astype(np.uint8)
+    hsv2rgb(hsv,1,1)
+    return hsv2rgb(hsv,1,1)
+
+
+
 
 class Node:
     def __init__(self):
         # Node related
-        # TODO: Add self.lidar_topic
         self.camera_topic                   = rospy.get_param('camera_topic', '/versavis/cam0/image_raw')
         self.lidar_topic                    = rospy.get_param('lidar_topic', '/rslidar_points')
         self.node_name                      = rospy.get_param('node_name', 'listener')
 
         rospy.init_node(self.node_name, anonymous=True)
 
-        # TODO: Add self.lidar_sub
         self.camera_sub                     = message_filters.Subscriber(self.camera_topic, Image)
-        self.cv_bridge                      = CvBridge()
         self.lidar_sub                      = message_filters.Subscriber(self.lidar_topic, PointCloud2)
 
-        # TODO: Add self.lidar_sub
+        self.cv_bridge                      = CvBridge()
+
         self.synchronizer                   = message_filters.ApproximateTimeSynchronizer([self.camera_sub, self.lidar_sub], 1, 0.05, reset=True)
+
+        # Output related
+        self.visualize                      = rospy.get_param('visualize', True)
 
         # Detector related
         self.detector_cfg = {}
@@ -86,7 +122,7 @@ class Node:
             if image_msg.height != 0:
                 cv_image = self.cv_bridge.imgmsg_to_cv2(image_msg, desired_encoding='bgr8')
 
-                scale_percent = 50 # percent of original size
+                scale_percent = 100 # percent of original size
                 width = int(cv_image.shape[1] * scale_percent / 100)
                 height = int(cv_image.shape[0] * scale_percent / 100)
                 dim = (width, height)
@@ -95,9 +131,9 @@ class Node:
                 undistorted_cv_image = self.imagehandler.undistort(cv_image)
 
                 full = np.hstack((cv2.resize(cv_image, dim, interpolation = cv2.INTER_AREA),cv2.resize(undistorted_cv_image, dim, interpolation = cv2.INTER_AREA)))
-                
+                cv2.imwrite("/home/oilter/Courses/SemesterProject/catkin_ws/src/object_detection/src/undistorted.png", full )
                 cv2.imshow("result", full)
-                cv2.waitKey(1)
+                cv2.waitKey(0)
 
                 #point_cloud = np.float32(ros_numpy.point_cloud2.pointcloud2_to_xyz_array(lidar_msg))
                 #
@@ -136,15 +172,30 @@ class Node:
                 point_cloud_XYZ = ros_numpy.point_cloud2.get_xyz_points(point_cloud, remove_nans=False)
                 img_pts, indices = self.imagehandler.projectPoints(point_cloud_XYZ)
                 
+                point_cloud_XYZ = point_cloud_XYZ[indices]
+
                 # Detect objects 
                 result = self.detector.detect(undistorted_cv_image, return_image=True)
 
+                # for idx, pt in enumerate(img_pts):
+                #     dist = np.linalg.norm(point_cloud_XYZ[idx])
+                #     color = depth_color(dist)
+                #     cv2.circle(result[1], tuple(pt), 1, color)
 
-                #for pt in img_pts:
-                #    cv2.circle(result, tuple(pt), 1, (255,0,0))
-                #
-                #cv2.imshow("result", result)
-                #cv2.waitKey(1)
+
+                for i in range(len(result[0])):
+                    in_BB_ind= points_in_BB(result[0], img_pts, i)
+                    
+                    # Visualize pointcloud on the image with objects
+                    if self.visualize:
+                        in_BB_XYZ = point_cloud_XYZ[in_BB_ind]
+                        for idx, pt in enumerate(img_pts[in_BB_ind]):
+                            dist = np.linalg.norm(in_BB_XYZ[idx])
+                            color = depth_color(dist)
+                            cv2.circle(result[1], tuple(pt), 1, color)
+
+                cv2.imshow("result", result[1])
+                cv2.waitKey(1)
 
         self.synchronizer.registerCallback(callback)
         rospy.spin()

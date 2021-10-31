@@ -56,10 +56,10 @@ class ObjectDetector:
         if self.architecture == 'yolo':
             output = self.detector(image)
             if return_image:
-                return [output.pandas().xyxy, output.render()[0] ]
+                return [output.pandas().xyxy[0], output.render()[0] ]
             
             else:
-                return [output.pandas().xyxy, None]
+                return [output.pandas().xyxy[0], None]
             
 
         elif self.architecture == 'detectron':

@@ -32,10 +32,9 @@ class ImageHandler:
         self.t = t
 
         # T_camera_lidar
-        self.T = np.zeros((4,4))
+        self.T = np.eye(4)
         self.T[:3,:3] = R
         self.T[:3,3] = t
-        self.T[3,3] = 1
 
     def undistort(self, img):
         
