@@ -27,6 +27,10 @@ class ImageHandler:
         self.P = np.zeros((3,4))
         self.P[:,:3] = self.new_K
 
+        self.map1, self.map2 = cv2.fisheye.initUndistortRectifyMap(self.K, self.dist, np.eye(3), self.new_K, (self.w,self.h),cv2.CV_16SC2)
+        
+
+
     def set_transformationparams(self, R, t):
         self.R = R
         self.t = t
@@ -38,15 +42,15 @@ class ImageHandler:
 
     def undistort(self, img):
         
-        dst = cv2.undistort(img, self.K, self.dist, None, self.new_K)
+        # dst = cv2.undistort(img, self.K, self.dist, self.new_K)
         
         #crop the image
         # x,y,w,h = self.roi
         # dst = dst[y:y+h, x:x+w]
         # 
-        self.w = dst.shape[1]
-        self.h = dst.shape[0]
 
+        # dst = cv2.fisheye.undistortImage(img, self.K, self.dist)
+        dst = cv2.remap(img, self.map1, self.map2, interpolation=cv2.INTER_LINEAR, borderMode=cv2.BORDER_CONSTANT)
         return dst
     
     def __undistortPoints(self, points):

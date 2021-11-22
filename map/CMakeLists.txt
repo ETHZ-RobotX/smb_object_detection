@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.0.2)
-project(object_detection)
+project(map)
 
 ## Compile as C++11, supported in ROS Kinetic and newer
 # add_compile_options(-std=c++11)
@@ -130,6 +130,7 @@ include_directories(
 ## as an example, code may need to be generated before libraries
 ## either from message generation or dynamic reconfigure
 # add_dependencies(${PROJECT_NAME} ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+# add_dependencies(${PROJECT_NAME} ${catkin_EXPORTED_TARGETS})
 
 ## Declare a C++ executable
 ## With catkin_make all packages are built within a single CMake context
@@ -169,7 +170,6 @@ install(DIRECTORY launch
 ## in contrast to setup.py, you can choose the destination
 catkin_install_python(PROGRAMS
   src/node.py
-  src/camera.py
   ${python_scripts_DIR}
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )

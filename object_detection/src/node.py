@@ -53,6 +53,7 @@ def depth_color(val, min_d=0, max_d=12):
 class Node:
     def __init__(self):
         # Node related
+        #self.camera_topic                   = rospy.get_param('camera_topic', '/versavis/cam0/undistorted')
         self.camera_topic                   = rospy.get_param('camera_topic', '/versavis/cam0/image_raw')
         self.lidar_topic                    = rospy.get_param('lidar_topic', '/rslidar_points')
         self.node_name                      = rospy.get_param('node_name', 'listener')
@@ -64,7 +65,8 @@ class Node:
 
         self.cv_bridge                      = CvBridge()
 
-        self.synchronizer                   = message_filters.ApproximateTimeSynchronizer([self.camera_sub, self.lidar_sub], 1, 0.05, reset=True)
+        # self.synchronizer                   = message_filters.ApproximateTimeSynchronizer([self.camera_sub, self.lidar_sub], 1, 0.05, reset=True)
+        self.synchronizer                   = message_filters.ApproximateTimeSynchronizer([self.camera_sub], 1, 0.05, reset=True)
 
         # Output related
         self.visualize                      = rospy.get_param('visualize', True)
@@ -81,17 +83,22 @@ class Node:
 
         # Camera Params
         self.imagehandler                   = ImageHandler()
+        self.i = 0
 
         # -------- TODO: REMOVE HARDCODED PARAMS ---------------------------
         K = np.eye(3)
         K[0,0] = 644.1589408974335
+        #K[0,0] = 644.0294071389192
         K[0,2] = 694.3102357386883
+        #K[0,2] = 1179.5
         K[1,1] = 643.8998733804048
+        #K[1,1] = 644.0294071389192
         K[1,2] = 574.1681961598792
+        #K[1,2] = 641.5
 
         dist = np.float32([ 0.005691383154435742, -0.0006697996624948808, -0.0031151487145129318, 0.002980432455329788])
         wh = [1440, 1080]
-
+        #wh = [2359, 1283]
 
         ##  rosrun tf tf_echo "rslidar" "blackfly_right_optical_link" 1
         ## - Translation: [-0.045, -0.293, -0.241]
@@ -127,13 +134,13 @@ class Node:
                 height = int(cv_image.shape[0] * scale_percent / 100)
                 dim = (width, height)
 
-                # undistorted_cv_image = cv_image
-                undistorted_cv_image = self.imagehandler.undistort(cv_image)
+                undistorted_cv_image = cv_image
+                # undistorted_cv_image = self.imagehandler.undistort(cv_image)
 
-                full = np.hstack((cv2.resize(cv_image, dim, interpolation = cv2.INTER_AREA),cv2.resize(undistorted_cv_image, dim, interpolation = cv2.INTER_AREA)))
-                cv2.imwrite("/home/oilter/Courses/SemesterProject/catkin_ws/src/object_detection/src/undistorted.png", full )
-                cv2.imshow("result", full)
-                cv2.waitKey(0)
+                # full = np.hstack((cv2.resize(cv_image, dim, interpolation = cv2.INTER_AREA),cv2.resize(undistorted_cv_image, dim, interpolation = cv2.INTER_AREA)))
+                # cv2.imwrite("/home/oilter/Courses/SemesterProject/catkin_ws/src/object_detection/src/undistorted.png", full )
+                # cv2.imshow("result", full)
+                # cv2.waitKey(0)
 
                 #point_cloud = np.float32(ros_numpy.point_cloud2.pointcloud2_to_xyz_array(lidar_msg))
                 #
@@ -156,9 +163,13 @@ class Node:
         def callback(image_msg, lidar_msg):
             # If Image Message is not empty 
             if image_msg.height != 0:               
-                
+                self.i = self.i + 1
                 # transform the image msg to numpy array after encoding
                 cv_image = self.cv_bridge.imgmsg_to_cv2(image_msg, desired_encoding='bgr8')
+
+                if self.i % 100 == 0:
+                    print(cv_image.shape)
+                    self.i = 0
 
                 # undistorted_cv_image = cv_image
                 undistorted_cv_image = self.imagehandler.undistort(cv_image)
@@ -177,33 +188,79 @@ class Node:
                 # Detect objects 
                 result = self.detector.detect(undistorted_cv_image, return_image=True)
 
-                # for idx, pt in enumerate(img_pts):
-                #     dist = np.linalg.norm(point_cloud_XYZ[idx])
-                #     color = depth_color(dist)
-                #     cv2.circle(result[1], tuple(pt), 1, color)
+                for idx, pt in enumerate(img_pts):
+                    dist = np.linalg.norm(point_cloud_XYZ[idx])
+                    color = depth_color(dist)
+                    cv2.circle(result[1], tuple(pt), 1, color)
 
 
-                for i in range(len(result[0])):
-                    in_BB_ind= points_in_BB(result[0], img_pts, i)
-                    
-                    # Visualize pointcloud on the image with objects
-                    if self.visualize:
-                        in_BB_XYZ = point_cloud_XYZ[in_BB_ind]
-                        for idx, pt in enumerate(img_pts[in_BB_ind]):
-                            dist = np.linalg.norm(in_BB_XYZ[idx])
-                            color = depth_color(dist)
-                            cv2.circle(result[1], tuple(pt), 1, color)
 
-                cv2.imshow("result", result[1])
+                # for i in range(len(result[0])):
+                #     in_BB_ind= points_in_BB(result[0], img_pts, i)
+                #     
+                #     # Visualize pointcloud on the image with objects
+                #     if self.visualize:
+                #         in_BB_XYZ = point_cloud_XYZ[in_BB_ind]
+                #         for idx, pt in enumerate(img_pts[in_BB_ind]):
+                #             dist = np.linalg.norm(in_BB_XYZ[idx])
+                #             color = depth_color(dist)
+                #             cv2.circle(result[1], tuple(pt), 1, color)
+
+                scale_percent = 100 # percent of original size
+                width = int(cv_image.shape[1] * scale_percent / 100)
+                height = int(cv_image.shape[0] * scale_percent / 100)
+                dim = (width, height)
+
+                # result[1] = cv2.resize(result[1], dim, interpolation = cv2.INTER_AREA)
+
+                cv2.imshow("result", cv2.resize(result[1], dim, interpolation = cv2.INTER_AREA))
+                cv2.waitKey(1)
+
+        self.synchronizer.registerCallback(callback)
+        rospy.spin()
+
+    def run3(self):
+        def callback(image_msg):
+            # If Image Message is not empty 
+            if image_msg.height != 0:               
+                self.i = self.i + 1
+                # transform the image msg to numpy array after encoding
+                cv_image = self.cv_bridge.imgmsg_to_cv2(image_msg, desired_encoding='bgr8')
+
+                # Detect objects 
+                result = self.detector.detect(cv_image, return_image=True)
+
+
+
+                # for i in range(len(result[0])):
+                #     in_BB_ind= points_in_BB(result[0], img_pts, i)
+                #     
+                #     # Visualize pointcloud on the image with objects
+                #     if self.visualize:
+                #         in_BB_XYZ = point_cloud_XYZ[in_BB_ind]
+                #         for idx, pt in enumerate(img_pts[in_BB_ind]):
+                #             dist = np.linalg.norm(in_BB_XYZ[idx])
+                #             color = depth_color(dist)
+                #             cv2.circle(result[1], tuple(pt), 1, color)
+
+                scale_percent = 100 # percent of original size
+                width = int(cv_image.shape[1] * scale_percent / 100)
+                height = int(cv_image.shape[0] * scale_percent / 100)
+                dim = (width, height)
+
+                # result[1] = cv2.resize(result[1], dim, interpolation = cv2.INTER_AREA)
+
+                cv2.imshow("result", cv2.resize(result[1], dim, interpolation = cv2.INTER_AREA))
                 cv2.waitKey(1)
 
         self.synchronizer.registerCallback(callback)
         rospy.spin()
 
 
+
 if __name__ == '__main__':
 
     node = Node()
     print("Detection started")
-    node.run2()
+    node.run3()
     
