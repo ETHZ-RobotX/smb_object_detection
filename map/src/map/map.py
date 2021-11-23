@@ -1,7 +1,7 @@
 from PIL.Image import FASTOCTREE
 import numpy as np
-import tf2_geometry_msgs
-import cv2
+from datetime import datetime
+import os
 
 AXIS = {'X' : 0,
         'Y' : 1,
@@ -13,7 +13,7 @@ AXIS = {'X' : 0,
 
 
 class Map:
-    def __init__(self, up, ceiling_th = 3, floor_th = 0.5, map_2D=None):
+    def __init__(self, up, path, time, ceiling_th = 3, floor_th = 0.5, map_2D=None):
         """
         Map Object init function
 
@@ -36,6 +36,9 @@ class Map:
                            "5", "6", "7", "8", "9", \
                            "14", "17"]
 
+        self.now  = time
+        self.file_name = path
+
         self.april_pos   = {}
         self.april_m_pos = {}
         self.april_color = {}        
@@ -56,7 +59,8 @@ class Map:
         # TODO: Add given map
 
         # TODO: Remove close points 
-        self.map_2D = self.to2D(walls)
+        # self.map_2D = self.to2D(walls)
+        self.map_2D = walls
 
     def to2D(self, points):
         points[:, self.up] = np.zeros((len(points[:, self.up])))
@@ -68,5 +72,24 @@ class Map:
         self.april_m_pos[str(id)] = np.mean(self.april_pos[str(id)], axis=0)
 
     
+    def getStats(self):
+       
+        now  = datetime.now()
+        now  = now.strftime("%H_%M_%S")
+
+        with open(self.file_name, "w+") as f:
+
+            f.write("Statistic of Localization of April Tags \n")
+            f.write("Date and Time: " + self.now + "\n")
+            f.write("\n")
+
+            for id in self.april_ids:
+                f.write("Tag " + str(id) + "\n")
+                f.write("Mean: " + str(np.mean(self.april_pos[str(id)], axis=0)) + "\n")
+                f.write("Median: " + str(np.median(self.april_pos[str(id)], axis=0)) + "\n")
+                f.write("Std: " + str(np.std(self.april_pos[str(id)], axis=0)) + "\n")
+                f.write("------------------------------------------------------------- \n")
 
 
+
+            f.write("Last Update at " + now + "\n")

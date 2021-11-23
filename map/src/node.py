@@ -1,33 +1,29 @@
 #!/usr/bin/env python
-from numpy.core.fromnumeric import transpose
-from ros_numpy import point_cloud2
-from rospy import exceptions
-import sensor_msgs 
 import rospy
-from roslib import message
 import ros_numpy
 import numpy as np
-import message_filters
-from sensor_msgs.msg import Image, PointCloud2
-from cv_bridge import CvBridge
-import cv2
-import tf
+from sensor_msgs.msg import PointCloud2
 import tf2_ros
-import tf2_geometry_msgs
 from tf2_sensor_msgs.tf2_sensor_msgs import do_transform_cloud
 from sensor_msgs.msg import PointField
 from std_msgs.msg import Header
 from visualization_msgs.msg import Marker, MarkerArray
 from geometry_msgs.msg import Pose
-import struct
+import rosbag
+from datetime import datetime
+import os
 
 from map.map import Map
 from apriltag_ros.msg import *
 
-def marker_(id, pos, color, type="all"):
+
+import warnings
+warnings.filterwarnings("ignore")
+
+def marker_(ns, marker_id, pos, color, type="all"):
 
     marker = Marker()
-    marker.ns = str(id)
+    marker.ns = str(ns)
     marker.header.frame_id = "map"
     marker.type = 2
     marker.action = 0
@@ -55,7 +51,7 @@ def marker_(id, pos, color, type="all"):
         marker.scale.z = 1.0
     else:
         
-        marker.id = np.random.default_rng().integers(0,10000)
+        marker.id = marker_id
         
         marker.scale.x = 0.1
         marker.scale.y = 0.1
@@ -116,36 +112,46 @@ IDs = [0,1,2,3,4,5,6,7,8,9,14,17]
 
 class Node:
     def __init__(self):
+        rospy.init_node("mapper", anonymous=True)
         # Node related
-        self.pc_map_topic                   = rospy.get_param('pc_map_topic', '/icp_node/icp_map')
-        self.lidar_topic                    = rospy.get_param('lidar_topic', '/rslidar_points')
-        self.tag_topic                      = rospy.get_param('tag_topic', '/tag_detections')
-        self.node_name                      = rospy.get_param('node_name', 'map')
-
-        rospy.init_node(self.node_name, anonymous=True)
+        self.pc_map_topic                   = rospy.get_param('~pc_map_topic', '/icp_node/icp_map')
+        self.lidar_topic                    = rospy.get_param('~lidar_topic', '/rslidar_points')
+        self.tag_topic                      = rospy.get_param('~tag_topic', '/tag_detections')
+        self.output_dir                     = rospy.get_param('~output_dir', '.')
+        self.log_period                     = rospy.get_param('~log_period', 20)
         self.tf_buffer = tf2_ros.Buffer(rospy.Duration(1.0)) #tf buffer length
         self.tf_listener = tf2_ros.TransformListener(self.tf_buffer)
 
-        self.mapper = Map("Z")
+        now  = datetime.now()
+        now  = now.strftime("%m_%d_%Y_%H_%M")
+        file_dir = os.path.join(self.output_dir, "mapping_stats_" + now)
+
+        self.mapper = Map("Z", file_dir + ".txt", now )
+        self.bag = rosbag.Bag(file_dir+'.bag', 'w')
 
         # Publisher
         self.pc_map_pub                     = rospy.Publisher(self.pc_map_topic + '_2D', PointCloud2, queue_size=1)
         self.lidar_pub                      = rospy.Publisher(self.lidar_topic + '_2D', PointCloud2, queue_size=10)
         self.marker_pub                     = rospy.Publisher(self.tag_topic + '_marker', MarkerArray, queue_size=10)
 
+        
+
     def pc_map_callback(self, data):
         # if self.mapper.map_2D is None:
+        self.bag.write('/icp_node/icp_map', data)
         point_cloud = ros_numpy.point_cloud2.pointcloud2_to_xyz_array(data)
-        print(point_cloud.shape)
         self.mapper.buildMap(point_cloud)
 
         pts = np.zeros((self.mapper.map_2D.shape[0], 7))
         pts[:,:3] = self.mapper.map_2D
 
         msg = point_cloud_(pts,'map')
+        self.bag.write('/icp_node/icp_map_2D', msg)
         while True:
             self.pc_map_pub.publish(msg)
-            rospy.sleep(10)
+            self.bag.write('/icp_node/icp_map', data)
+            self.bag.write('/icp_node/icp_map_2D', msg)
+            rospy.sleep(self.log_period)
             
 
     def tag_callback(self, data):
@@ -159,7 +165,7 @@ class Node:
             transform = self.tf_buffer.lookup_transform('map',
                                         'tag_' + str(tag.id[0]), #source frame
                                         rospy.Time(0),
-                                        rospy.Duration(2.0)) #get the tf at first available time) #wait for 1 second
+                                        rospy.Duration(5.0)) #get the tf at first available time) #wait for 5 second
 
             xyz = np.array([transform.transform.translation.x, transform.transform.translation.y, transform.transform.translation.z ])
             # xyz = np.array([tag.pose.pose.pose.position.x, tag.pose.pose.pose.position.y, tag.pose.pose.pose.position.z ])    
@@ -169,11 +175,15 @@ class Node:
             m_pos = self.mapper.april_m_pos[str(tag.id[0])]
             pos   = self.mapper.april_pos[str(tag.id[0])]
 
-            for p in pos:
-                markers.markers.append(marker_(str(tag.id[0]), p, color))
+            for id,p in enumerate(pos):
+                markers.markers.append(marker_(str(tag.id[0]), id, p, color))
 
             markers.markers.append(marker_(str(tag.id[0]), m_pos, color, type="mean"))
             self.marker_pub.publish(markers)
+
+        if int(rospy.get_time()) % self.log_period == 0 and int(rospy.get_time()) != 0:
+            self.save_stats()
+            
 
 
     def lidar_callback(self, data):
@@ -198,10 +208,30 @@ class Node:
 
         self.lidar_pub.publish(msg)
 
+    def save_stats(self):
+        self.mapper.getStats()
+
+        markers = MarkerArray()
+        for id in IDs:
+            color = self.mapper.april_color[str(id)]
+            m_pos = self.mapper.april_m_pos[str(id)]
+
+            if m_pos is None:
+                continue
+
+            pos   = self.mapper.april_pos[str(id)]
+
+            for p in pos:
+                markers.markers.append(marker_(str(id), p, color))
+
+            markers.markers.append(marker_(str(id), m_pos, color, type="mean"))
+            self.marker_pub.publish(markers)
+            self.bag.write('/tags', markers)
+
+
     
     def run(self):
-        # self.pc_map_sub                     = rospy.Subscriber(self.pc_map_topic, PointCloud2, self.pc_map_callback)
-        # self.lidar_sub                      = rospy.Subscriber(self.lidar_topic, PointCloud2, self.lidar_callback)
+        self.pc_map_sub                     = rospy.Subscriber(self.pc_map_topic, PointCloud2, self.pc_map_callback)
         self.tag_sub                        = rospy.Subscriber(self.tag_topic , AprilTagDetectionArray, self.tag_callback) 
 
         rospy.spin()
@@ -211,6 +241,7 @@ if __name__ == '__main__':
         node = Node()
         print("Mapping started")
         node.run()
-
-
+        node.save_stats()
+        print("End of Mapping")
+        node.bag.close()
     
