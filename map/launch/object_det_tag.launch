@@ -1,24 +1,5 @@
 <launch>
   
-  <arg name="input_camera_name" default="/versavis/cam0" />
-  <arg name="scale" default="1.0" />
-
-  <node pkg="image_proc" type="image_proc" name="debayer" ns="$(arg input_camera_name)/" />
-
-  <arg name="calib_path" default="$(find image_undistort)/cfg/input_config4.yaml"/>
-  <node name="image_undistort_node" pkg="image_undistort" type="image_undistort_node" output="screen" clear_params="true">
-    <param name="process_image" value="true"/> 
-    <param name="input_camera_namespace" value="versavis"/>      
-    <param name="input_camera_info_from_ros_params" value = "true"/>    
-    <param name="scale" value="$(arg scale)"/>
-    <param name="output_camera_info_source" value="auto_generated"/>
-    <param name="publish_tf" value="false"/>
-    <rosparam file="$(arg calib_path)"/>
-    <remap from="input/image" to="$(arg input_camera_name)/image_color"/>
-    <remap from="output/image" to="$(arg input_camera_name)/undistorted"/>
-    <remap from="output/camera_info" to="$(arg input_camera_name)/undistorted/info"/>
-  </node>
-
   <node pkg="tf2_ros" type="static_transform_publisher" name="apriltags_in_camera_frame" args="0 0 0 0 0 0 blackfly_right_optical_link output_camera" />
   
   <arg name="launch_prefix" default="" /> <!-- set to value="gdbserver localhost:10000" for remote debugging -->
@@ -28,7 +9,7 @@
   <arg name="camera_frame" default="blackfly_right_optical_link" />
 
   <!-- Set parameters -->
-  <arg name="tag_file" default="$(find apriltag_ros)/config/tags.yaml" />
+  <arg name="tag_file" default="$(find apriltag_ros)/config/tags5.yaml" />
   <rosparam command="load" file="$(find apriltag_ros)/config/settings.yaml" ns="$(arg node_namespace)" />
   <rosparam command="load" file="$(arg tag_file)" ns="$(arg node_namespace)" />
   

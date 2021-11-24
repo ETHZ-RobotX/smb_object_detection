@@ -22,6 +22,26 @@ def points_in_BB(object, ind, points2D):
 
     return inside_BB
 
+def objectpos (points3D, method="mean"):
+    """
+    Args:
+        points3D        : lidar points inside bounding box in 3D
+        method          : the way to calculate points on the 
+    
+    Returns:
+        pos             : position of the object 
+    """
+
+    if method == "mean":
+        pos = np.mean(points3D, axis=0)
+    
+    # TODO: Add more method
+    # elif method == "median_dist":
+    #     distance = np.median(np.linalg.norm(points3D, axis=1))
+
+
+    return pos
+
 def distance2object(points3D, method="mean_dist"):
     """
     Args:

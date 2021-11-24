@@ -215,7 +215,7 @@ class Node:
         for id in IDs:
             color = self.mapper.april_color[str(id)]
             m_pos = self.mapper.april_m_pos[str(id)]
-
+    
             if m_pos is None:
                 continue
 

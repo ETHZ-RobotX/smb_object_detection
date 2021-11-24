@@ -5,9 +5,12 @@ import ros_numpy
 import numpy as np
 import message_filters
 from sensor_msgs.msg import Image, PointCloud2, CameraInfo
+from visualization_msgs.msg import Marker, MarkerArray
+from geometry_msgs.msg import Pose, TransformStamped
+from apriltag_ros.msg import *
 from cv_bridge import CvBridge
 import cv2
-import tf
+import tf2_ros
 
 from object_detection.objectdetector import ObjectDetector
 from object_detection.reproject import ImageHandler
@@ -47,6 +50,66 @@ def depth_color(val, min_d=0, max_d=20):
     hsv2rgb(hsv,1,1)
     return hsv2rgb(hsv,1,1)
 
+def marker_(ns, marker_id, pos, color, type="all"):
+
+    marker = Marker()
+    marker.ns = str(ns)
+    marker.header.frame_id = "map"
+    marker.type = 2
+    marker.action = 0
+    marker.pose = Pose()
+
+    marker.pose.position.x = pos[0]
+    marker.pose.position.y = pos[1]
+    marker.pose.position.z = pos[2]
+
+    marker.pose.orientation.x = 0
+    marker.pose.orientation.y = 0
+    marker.pose.orientation.z = 0
+    marker.pose.orientation.w = 1
+
+    marker.color.r = color[0]
+    marker.color.g = color[1]
+    marker.color.b = color[2]
+    marker.color.a = 1.0
+
+    if type=="mean":
+        marker.id = 10000
+
+        marker.scale.x = 0.1
+        marker.scale.y = 0.1
+        marker.scale.z = 1.0
+    else:
+        
+        marker.id = marker_id
+        
+        marker.scale.x = 0.1
+        marker.scale.y = 0.1
+        marker.scale.z = 0.3
+
+
+    marker.frame_locked = False
+        
+    return marker
+
+
+def transformstamped_(frame_id, child_id, pose, rot):
+    t = TransformStamped()
+
+    t.header.stamp = rospy.Time.now()
+    t.header.frame_id = frame_id
+    t.child_frame_id = child_id
+    t.transform.translation.x = pose[0]
+    t.transform.translation.y = pose[1]
+    t.transform.translation.z = pose[2]
+    t.transform.rotation.x = rot[0]
+    t.transform.rotation.y = rot[1]
+    t.transform.rotation.z = rot[2]
+    t.transform.rotation.w = rot[3]
+
+    return t
+
+
 class Node:
     def __init__(self):
 
@@ -70,8 +133,20 @@ class Node:
         self.visualize                      = rospy.get_param('visualize', True)
         self.visualize_all_points           = rospy.get_param('~visualize_all_points', False)
         self.out_image_pub_topic            = rospy.get_param('~out_image_pub_topic', "/versavis/cam0/undistorted/objects")
-        self.out_image_pub                  = rospy.Publisher(self.out_image_pub_topic , Image, queue_size=5)
 
+        self.out_image_pub                  = rospy.Publisher(self.out_image_pub_topic , Image, queue_size=5)
+        self.TF_br                          = tf2_ros.StaticTransformBroadcaster()
+
+        self.obj_marker_topic               = rospy.get_param('obj_marker_topic', '/object')
+        self.marker_pub                     = rospy.Publisher(self.obj_marker_topic , MarkerArray, queue_size=10)
+
+        # Verify the location with AprilTag
+        self.tf_buffer                      = tf2_ros.Buffer(rospy.Duration(1.0)) #tf buffer length
+        self.tf_listener                    = tf2_ros.TransformListener(self.tf_buffer)
+        self.tag_topic                      = rospy.get_param('~tag_topic', '/tag_detections')
+        self.tag_pos                        = np.empty((0,3))
+        self.mean_tag_pos                   = None
+        self.obj_id                         = 0
 
         # Detector related
         self.detector_cfg = {}
@@ -120,6 +195,22 @@ class Node:
         self.imagehandler.set_cameraparams(K, [w,h])
         rospy.sleep(self.camera_info_callback_sleep)
 
+    def tag_callback(self, data):
+        
+        for tag in data.detections:
+            # print("Tag ",tag.id[0]," has been seen." )
+
+
+            transform = self.tf_buffer.lookup_transform('map',
+                                        'tag_' + str(tag.id[0]), #source frame
+                                        rospy.Time(0),
+                                        rospy.Duration(5.0)) #get the tf at first available time) #wait for 5 second
+
+            xyz = np.array([transform.transform.translation.x, transform.transform.translation.y, transform.transform.translation.z ])
+            self.tag_pos = np.vstack([self.tag_pos, xyz])
+            self.mean_tag_pos = np.mean(self.tag_pos, axis=0)
+
+
     def run(self):
         def callback(image_msg, lidar_msg):
             # If Image Message is not empty 
@@ -147,13 +238,31 @@ class Node:
                     #Find the points that are inside the bounding box of the object
                     in_BB_ind= points_in_BB(result[0], i, img_pts)
                     in_BB_XYZ = point_cloud_XYZ[in_BB_ind]
+                    
+                    xyz = objectpos(in_BB_XYZ, method="mean")
 
-                    d_md = distance2object(in_BB_XYZ, method="mean_dist")
-                    d_mz = distance2object(in_BB_XYZ, method="mean_z")
-                    d_med = distance2object(in_BB_XYZ, method="median_dist")
-                    d_mez = distance2object(in_BB_XYZ, method="median_z")
+                    # transformstamped_("blackfly_right_optical_link", "object", xyz, [0,0,0,1])
+                    self.TF_br.sendTransform(transformstamped_("blackfly_right_optical_link", "object", xyz, [0,0,0,1]))
+                    
+                    transform = self.tf_buffer.lookup_transform("map", "object",
+                                                                rospy.Time(0),
+                                                                rospy.Duration(10.0))
+                    
+                    obj_in_map = np.array([transform.transform.translation.x, transform.transform.translation.y, transform.transform.translation.z ])
+                    markers = MarkerArray()
+                    markers.markers.append(marker_("object", self.obj_id, obj_in_map, [1.0,0,0]))
+                    if self.mean_tag_pos is not None:
+                        markers.markers.append(marker_("tag", 1, self.mean_tag_pos, [0,1.0,0]))
+                    self.marker_pub.publish(markers)                
 
-                    print("d_md : %.4f  , d_mz : %.4f, d_med : %.4f, d_mez : %.4f " % (d_md, d_mz, d_med, d_mez))
+                    self.obj_id += 1
+
+
+                    # d_md = distance2object(in_BB_XYZ, method="mean_dist")
+                    # d_mz = distance2object(in_BB_XYZ, method="mean_z")
+                    # d_med = distance2object(in_BB_XYZ, method="median_dist")
+                    # d_mez = distance2object(in_BB_XYZ, method="median_z")
+                    # print("d_md : %.4f  , d_mz : %.4f, d_med : %.4f, d_mez : %.4f " % (d_md, d_mz, d_med, d_mez))
 
                     # Visualize pointcloud on the image with objects
                     if self.visualize and not self.visualize_all_points:
@@ -164,7 +273,8 @@ class Node:
 
                 self.out_image_pub.publish(self.cv_bridge.cv2_to_imgmsg(result[1], 'bgr8'))
 
-        self.camera_info_sub = rospy.Subscriber(self.camera_info_topic , CameraInfo, self.image_info_callback) 
+        self.camera_info_sub = rospy.Subscriber(self.camera_info_topic , CameraInfo, self.image_info_callback)
+        self.tag_sub         = rospy.Subscriber(self.tag_topic , AprilTagDetectionArray, self.tag_callback) 
         self.synchronizer.registerCallback(callback)
         rospy.spin()
 
