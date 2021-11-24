@@ -6,12 +6,10 @@ Panels:
       Expanded:
         - /Global Options1
         - /Status1
+        - /RobotModel1/Status1
         - /RobotModel1/Links1
         - /TF1/Frames1
         - /TF1/Tree1
-        - /TF1/Tree1/map1
-        - /TF1/Tree1/map1/odom1
-        - /TF1/Tree1/map1/odom1/odom_source1
         - /MarkerArray1/Namespaces1
       Splitter Ratio: 0.5841924548149109
     Tree Height: 425
@@ -232,23 +230,9 @@ Visualization Manager:
           Value: true
         rslidar_base_link:
           Value: true
-        tag_1:
+        tag_0:
           Value: true
-        tag_17:
-          Value: true
-        tag_2:
-          Value: true
-        tag_3:
-          Value: true
-        tag_4:
-          Value: true
-        tag_5:
-          Value: true
-        tag_6:
-          Value: true
-        tag_7:
-          Value: true
-        tag_9:
+        tag_14:
           Value: true
         top:
           Value: true
@@ -268,14 +252,6 @@ Visualization Manager:
           odom:
             odom_source:
               base_link:
-                LF_WHEEL:
-                  {}
-                LH_WHEEL:
-                  {}
-                RF_WHEEL:
-                  {}
-                RH_WHEEL:
-                  {}
                 base_inertia:
                   {}
                 blackfly0_link:
@@ -290,23 +266,9 @@ Visualization Manager:
                 blackfly_right_link:
                   blackfly_right_optical_link:
                     output_camera:
-                      tag_1:
+                      tag_0:
                         {}
-                      tag_17:
-                        {}
-                      tag_2:
-                        {}
-                      tag_3:
-                        {}
-                      tag_4:
-                        {}
-                      tag_5:
-                        {}
-                      tag_6:
-                        {}
-                      tag_7:
-                        {}
-                      tag_9:
+                      tag_14:
                         {}
                 imu_link:
                   imu:
@@ -318,10 +280,10 @@ Visualization Manager:
                           camera_accel_optical_frame:
                             {}
                         camera_gyro_frame:
-                          {}
+                          camera_imu_optical_frame:
+                            {}
                     realsense_t265_odom_frame:
-                      camera_imu_optical_frame:
-                        {}
+                      {}
                 lidar_mount_link:
                   {}
                 mono_link:
@@ -356,7 +318,7 @@ Visualization Manager:
       Color: 255; 255; 255
       Color Transformer: Intensity
       Decay Time: 0
-      Enabled: true
+      Enabled: false
       Invert Rainbow: false
       Max Color: 255; 255; 255
       Min Color: 0; 0; 0
@@ -371,7 +333,7 @@ Visualization Manager:
       Unreliable: false
       Use Fixed Frame: true
       Use rainbow: true
-      Value: true
+      Value: false
     - Alpha: 1
       Autocompute Intensity Bounds: true
       Autocompute Value Bounds:
@@ -407,6 +369,43 @@ Visualization Manager:
       Name: Axes
       Radius: 0.10000000149011612
       Reference Frame: <Fixed Frame>
+      Value: true
+    - Class: rviz/MarkerArray
+      Enabled: true
+      Marker Topic: /tag_detections_marker
+      Name: MarkerArray
+      Namespaces:
+        0: true
+        14: true
+      Queue Size: 100
+      Value: true
+    - Alpha: 1
+      Autocompute Intensity Bounds: true
+      Autocompute Value Bounds:
+        Max Value: 10
+        Min Value: -10
+        Value: true
+      Axis: Z
+      Channel Name: intensity
+      Class: rviz/PointCloud2
+      Color: 255; 255; 255
+      Color Transformer: Intensity
+      Decay Time: 0
+      Enabled: true
+      Invert Rainbow: false
+      Max Color: 255; 255; 255
+      Min Color: 0; 0; 0
+      Name: PointCloud2
+      Position Transformer: XYZ
+      Queue Size: 10
+      Selectable: true
+      Size (Pixels): 3
+      Size (m): 0.009999999776482582
+      Style: Flat Squares
+      Topic: /icp_node/icp_map_2D
+      Unreliable: false
+      Use Fixed Frame: true
+      Use rainbow: true
       Value: true
   Enabled: true
   Global Options:
@@ -447,9 +446,9 @@ Visualization Manager:
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 1.2503955364227295
+      Pitch: 0.5697972774505615
       Target Frame: <Fixed Frame>
-      Yaw: 3.1240339279174805
+      Yaw: 3.1190385818481445
     Saved: ~
 Window Geometry:
   Displays:
@@ -457,7 +456,7 @@ Window Geometry:
   Height: 654
   Hide Left Dock: false
   Hide Right Dock: false
-  QMainWindow State: 000000ff00000000fd00000001000000000000024800000234fc0200000001fb000000100044006900730070006c006100790073010000003d00000234000000c900ffffff000002320000023400000004000000040000000800000008fc0000000100000002000000010000000a0054006f006f006c00730100000000ffffffff0000000000000000
+  QMainWindow State: 000000ff00000000fd00000001000000000000021100000234fc0200000001fb000000100044006900730070006c006100790073010000003d00000234000000c900ffffff000002690000023400000004000000040000000800000008fc0000000100000002000000010000000a0054006f006f006c00730100000000ffffffff0000000000000000
   Width: 1152
   X: 662
-  Y: 91
+  Y: 54

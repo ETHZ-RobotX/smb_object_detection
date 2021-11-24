@@ -178,7 +178,7 @@ class Node:
             for id,p in enumerate(pos):
                 markers.markers.append(marker_(str(tag.id[0]), id, p, color))
 
-            markers.markers.append(marker_(str(tag.id[0]), m_pos, color, type="mean"))
+            markers.markers.append(marker_(str(tag.id[0]),id, m_pos, color, type="mean"))
             self.marker_pub.publish(markers)
 
         if int(rospy.get_time()) % self.log_period == 0 and int(rospy.get_time()) != 0:
@@ -221,10 +221,10 @@ class Node:
 
             pos   = self.mapper.april_pos[str(id)]
 
-            for p in pos:
-                markers.markers.append(marker_(str(id), p, color))
+            for i,p in enumerate(pos):
+                markers.markers.append(marker_(str(id),i, p, color))
 
-            markers.markers.append(marker_(str(id), m_pos, color, type="mean"))
+            markers.markers.append(marker_(str(id),i, m_pos, color, type="mean"))
             self.marker_pub.publish(markers)
             self.bag.write('/tags', markers)
 

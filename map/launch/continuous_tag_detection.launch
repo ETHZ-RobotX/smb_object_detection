@@ -5,7 +5,7 @@
 
   <node pkg="image_proc" type="image_proc" name="debayer" ns="$(arg input_camera_name)/" />
 
-  <arg name="calib_path" default="/home/oilter/Courses/SemesterProject/catkin_ws/src/image_undistort/cfg/input_config4.yaml"/>
+  <arg name="calib_path" default="$(find image_undistort)/cfg/input_config4.yaml"/>
   <node name="image_undistort_node" pkg="image_undistort" type="image_undistort_node" output="screen" clear_params="true">
     <param name="process_image" value="true"/> 
     <param name="input_camera_namespace" value="versavis"/>      

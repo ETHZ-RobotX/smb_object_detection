@@ -16,6 +16,10 @@
   <arg name="simulation" default="true"/>
   <arg name="lidar" default="true"/>
   <arg name="wheel_joint_type"   default="continuous"/>
+  <!-- Open Rviz or Not -->
+  <arg name="visualize" default="1"/>
+  <!--Rviz config Directory-->
+  <arg name="RvizConf" default="$(find map)/rviz/all_frames.rviz"/>
 
   
   <!-- Load robot description -->
@@ -44,9 +48,10 @@
     <remap from="joint_states"      to="$(arg joint_states_topic)"/>
   </node>
 
-  <!-- Open Rviz -->
-  <node name="rviz" pkg="rviz" type="rviz"
-  args="-d $(find smb_description)/rviz/smb_description.rviz"
-  output="screen"/>
-
+  <group if="$(eval arg('visualize')==1)">
+    <!-- Open Rviz -->
+    <node name="rviz" pkg="rviz" type="rviz"
+    args="-d $(arg RvizConf)"
+    output="screen"/>
+  </group>
 </launch>

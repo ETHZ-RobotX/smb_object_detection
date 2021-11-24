@@ -84,7 +84,7 @@ class Map:
             f.write("\n")
 
             for id in self.april_ids:
-                f.write("Tag " + str(id) + "\n")
+                f.write("Tag " + str(id) + ", color: "+ str(self.april_color[str(id)]) + "\n")
                 f.write("Mean: " + str(np.mean(self.april_pos[str(id)], axis=0)) + "\n")
                 f.write("Median: " + str(np.median(self.april_pos[str(id)], axis=0)) + "\n")
                 f.write("Std: " + str(np.std(self.april_pos[str(id)], axis=0)) + "\n")

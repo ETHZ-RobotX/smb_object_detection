@@ -4,13 +4,13 @@ import rospy
 import ros_numpy
 import numpy as np
 import message_filters
-from sensor_msgs.msg import Image, PointCloud2
+from sensor_msgs.msg import Image, PointCloud2, CameraInfo
 from cv_bridge import CvBridge
 import cv2
 import tf
 
 from object_detection.objectdetector import ObjectDetector
-from object_detection.imagehandler import ImageHandler
+from object_detection.reproject import ImageHandler
 from object_detection.modelextractor import *
 
 
@@ -36,7 +36,7 @@ def hsv2rgb(h, s, v):
     return r, g, b
 
 
-def depth_color(val, min_d=0, max_d=12):
+def depth_color(val, min_d=0, max_d=20):
     """
     print Color(HSV's H value) corresponding to distance(m)
     close distance = red , far distance = blue
@@ -47,58 +47,51 @@ def depth_color(val, min_d=0, max_d=12):
     hsv2rgb(hsv,1,1)
     return hsv2rgb(hsv,1,1)
 
-
-
-
 class Node:
     def __init__(self):
+
+        rospy.init_node("objectify", anonymous=True)
+
         # Node related
-        #self.camera_topic                   = rospy.get_param('camera_topic', '/versavis/cam0/undistorted')
-        self.camera_topic                   = rospy.get_param('camera_topic', '/versavis/cam0/image_raw')
-        self.lidar_topic                    = rospy.get_param('lidar_topic', '/rslidar_points')
-        self.node_name                      = rospy.get_param('node_name', 'listener')
+        self.camera_topic                   = rospy.get_param('~camera_topic', '/versavis/cam0/undistorted')
+        self.camera_info_topic              = rospy.get_param('~camera_info_topic', '/versavis/cam0/camera_info')
+        self.lidar_topic                    = rospy.get_param('~lidar_topic', '/rslidar_points')
 
-        rospy.init_node(self.node_name, anonymous=True)
-
+        self.camera_info_callback_sleep     = rospy.get_param('~camera_info_callback_sleep', 20)
+        
         self.camera_sub                     = message_filters.Subscriber(self.camera_topic, Image)
         self.lidar_sub                      = message_filters.Subscriber(self.lidar_topic, PointCloud2)
 
         self.cv_bridge                      = CvBridge()
 
-        # self.synchronizer                   = message_filters.ApproximateTimeSynchronizer([self.camera_sub, self.lidar_sub], 1, 0.05, reset=True)
-        self.synchronizer                   = message_filters.ApproximateTimeSynchronizer([self.camera_sub], 1, 0.05, reset=True)
-
+        self.synchronizer                   = message_filters.ApproximateTimeSynchronizer([self.camera_sub, self.lidar_sub], 1, 0.05, reset=True)
+        
         # Output related
         self.visualize                      = rospy.get_param('visualize', True)
+        self.visualize_all_points           = rospy.get_param('~visualize_all_points', False)
+        self.out_image_pub_topic            = rospy.get_param('~out_image_pub_topic', "/versavis/cam0/undistorted/objects")
+        self.out_image_pub                  = rospy.Publisher(self.out_image_pub_topic , Image, queue_size=5)
+
 
         # Detector related
         self.detector_cfg = {}
-        self.detector_cfg['architecture']   = rospy.get_param('architecture', 'yolo')
-        self.detector_cfg['model']          = rospy.get_param('model', 'yolov5n')
-        self.detector_cfg['checkpoint']     = rospy.get_param('checkpoint', None)
-        self.detector_cfg['device']         = rospy.get_param('device', 'cpu')
-        self.detector_cfg['confident']      = rospy.get_param('confident', 0.5)
-        self.detector_cfg['iou']            = rospy.get_param('iou', 0.45)
-        self.detector_cfg['classes']        = rospy.get_param('classes',  None)
+        self.detector_cfg['architecture']   = rospy.get_param('~architecture', 'yolo')
+        self.detector_cfg['model']          = rospy.get_param('~model', 'yolov5n')
+        self.detector_cfg['checkpoint']     = rospy.get_param('~checkpoint', None)
+        self.detector_cfg['device']         = rospy.get_param('~device', 'cpu')
+        self.detector_cfg['confident']      = rospy.get_param('~confident', 0.5)
+        self.detector_cfg['iou']            = rospy.get_param('~iou', 0.45)
+        classes                             = rospy.get_param('~classes',  None)
+        if classes != 'None':
+            classes = np.array([[int(x.strip(' ')) for x in ss.lstrip(' [,').split(', ')] for ss in classes.rstrip(']').split(']')])
+            self.detector_cfg['classes'] = list(classes.flatten())
+        else:
+            self.detector_cfg['classes'] = None
 
         # Camera Params
         self.imagehandler                   = ImageHandler()
-        self.i = 0
 
         # -------- TODO: REMOVE HARDCODED PARAMS ---------------------------
-        K = np.eye(3)
-        K[0,0] = 644.1589408974335
-        #K[0,0] = 644.0294071389192
-        K[0,2] = 694.3102357386883
-        #K[0,2] = 1179.5
-        K[1,1] = 643.8998733804048
-        #K[1,1] = 644.0294071389192
-        K[1,2] = 574.1681961598792
-        #K[1,2] = 641.5
-
-        dist = np.float32([ 0.005691383154435742, -0.0006697996624948808, -0.0031151487145129318, 0.002980432455329788])
-        wh = [1440, 1080]
-        #wh = [2359, 1283]
 
         ##  rosrun tf tf_echo "rslidar" "blackfly_right_optical_link" 1
         ## - Translation: [-0.045, -0.293, -0.241]
@@ -112,155 +105,72 @@ class Node:
 
         t_camera_lidar = np.float64([-0.045, -0.293, -0.241])
 
-        R = R_camera_lidar
-        t = t_camera_lidar
-
         # -------- TODO: REMOVE HARDCODED PARAMS ---------------------------
 
-        self.imagehandler.set_cameraparams(K, dist, wh)
-        self.imagehandler.set_transformationparams(R,t)
+        self.imagehandler.set_transformationparams(R_camera_lidar,t_camera_lidar)
         
         self.detector                       = ObjectDetector(self.detector_cfg)
         print("Detector is set")
 
+    def image_info_callback(self, camera_info):
+        h = camera_info.height
+        w = camera_info.width
+        K = np.array(camera_info.K, dtype=np.float64).reshape(3,3)
+
+        self.imagehandler.set_cameraparams(K, [w,h])
+        rospy.sleep(self.camera_info_callback_sleep)
 
     def run(self):
         def callback(image_msg, lidar_msg):
-            if image_msg.height != 0:
-                cv_image = self.cv_bridge.imgmsg_to_cv2(image_msg, desired_encoding='bgr8')
-
-                scale_percent = 100 # percent of original size
-                width = int(cv_image.shape[1] * scale_percent / 100)
-                height = int(cv_image.shape[0] * scale_percent / 100)
-                dim = (width, height)
-
-                undistorted_cv_image = cv_image
-                # undistorted_cv_image = self.imagehandler.undistort(cv_image)
-
-                # full = np.hstack((cv2.resize(cv_image, dim, interpolation = cv2.INTER_AREA),cv2.resize(undistorted_cv_image, dim, interpolation = cv2.INTER_AREA)))
-                # cv2.imwrite("/home/oilter/Courses/SemesterProject/catkin_ws/src/object_detection/src/undistorted.png", full )
-                # cv2.imshow("result", full)
-                # cv2.waitKey(0)
-
-                #point_cloud = np.float32(ros_numpy.point_cloud2.pointcloud2_to_xyz_array(lidar_msg))
-                #
-                #img_pts = self.imagehandler.projectPoints(point_cloud)
-                ## img_pts_cv, img_pts_classic = self.imagehandler.projectPoints2(point_cloud)
-                ## print(img_pts)
-                #                
-                #result = self.detector.detect(undistorted_cv_image)
-
-                #for pt in img_pts:
-                #    cv2.circle(result, tuple(pt), 1, (255,0,0))
-                #
-                #cv2.imshow("result", result)
-                #cv2.waitKey(1)
-
-        self.synchronizer.registerCallback(callback)
-        rospy.spin()
-
-    def run2(self):
-        def callback(image_msg, lidar_msg):
             # If Image Message is not empty 
             if image_msg.height != 0:               
-                self.i = self.i + 1
-                # transform the image msg to numpy array after encoding
-                cv_image = self.cv_bridge.imgmsg_to_cv2(image_msg, desired_encoding='bgr8')
-
-                if self.i % 100 == 0:
-                    print(cv_image.shape)
-                    self.i = 0
-
-                # undistorted_cv_image = cv_image
-                undistorted_cv_image = self.imagehandler.undistort(cv_image)
+                # transform the image msg to numpy array
+                cv_image = self.cv_bridge.imgmsg_to_cv2(image_msg)
 
                 # transform the pointcloud msg to numpy array and remove nans
-                point_cloud = ros_numpy.point_cloud2.pointcloud2_to_array(lidar_msg)
-                mask = np.isfinite(point_cloud['x']) & np.isfinite(point_cloud['y']) & np.isfinite(point_cloud['z'])
-                point_cloud = point_cloud[mask]
-
-                # project points onto image
-                point_cloud_XYZ = ros_numpy.point_cloud2.get_xyz_points(point_cloud, remove_nans=False)
-                img_pts, indices = self.imagehandler.projectPoints(point_cloud_XYZ)
+                point_cloud_XYZ = ros_numpy.point_cloud2.pointcloud2_to_xyz_array(lidar_msg)
+                point_cloud_XYZ = self.imagehandler.translatePoints(point_cloud_XYZ)
+                img_pts, indices = self.imagehandler.projectPointsOnImage(point_cloud_XYZ)
                 
                 point_cloud_XYZ = point_cloud_XYZ[indices]
 
                 # Detect objects 
-                result = self.detector.detect(undistorted_cv_image, return_image=True)
-
-                for idx, pt in enumerate(img_pts):
-                    dist = np.linalg.norm(point_cloud_XYZ[idx])
-                    color = depth_color(dist)
-                    cv2.circle(result[1], tuple(pt), 1, color)
-
-
-
-                # for i in range(len(result[0])):
-                #     in_BB_ind= points_in_BB(result[0], img_pts, i)
-                #     
-                #     # Visualize pointcloud on the image with objects
-                #     if self.visualize:
-                #         in_BB_XYZ = point_cloud_XYZ[in_BB_ind]
-                #         for idx, pt in enumerate(img_pts[in_BB_ind]):
-                #             dist = np.linalg.norm(in_BB_XYZ[idx])
-                #             color = depth_color(dist)
-                #             cv2.circle(result[1], tuple(pt), 1, color)
-
-                scale_percent = 100 # percent of original size
-                width = int(cv_image.shape[1] * scale_percent / 100)
-                height = int(cv_image.shape[0] * scale_percent / 100)
-                dim = (width, height)
-
-                # result[1] = cv2.resize(result[1], dim, interpolation = cv2.INTER_AREA)
-
-                cv2.imshow("result", cv2.resize(result[1], dim, interpolation = cv2.INTER_AREA))
-                cv2.waitKey(1)
-
-        self.synchronizer.registerCallback(callback)
-        rospy.spin()
-
-    def run3(self):
-        def callback(image_msg):
-            # If Image Message is not empty 
-            if image_msg.height != 0:               
-                self.i = self.i + 1
-                # transform the image msg to numpy array after encoding
-                cv_image = self.cv_bridge.imgmsg_to_cv2(image_msg, desired_encoding='bgr8')
-
-                # Detect objects 
                 result = self.detector.detect(cv_image, return_image=True)
 
+                if self.visualize and self.visualize_all_points:
+                    for idx, pt in enumerate(img_pts):
+                        dist = np.linalg.norm(point_cloud_XYZ[idx])
+                        color = depth_color(dist)
+                        cv2.circle(result[1], tuple(pt), 1, color)
 
+                for i in range(len(result[0])):
+                    #Find the points that are inside the bounding box of the object
+                    in_BB_ind= points_in_BB(result[0], i, img_pts)
+                    in_BB_XYZ = point_cloud_XYZ[in_BB_ind]
 
-                # for i in range(len(result[0])):
-                #     in_BB_ind= points_in_BB(result[0], img_pts, i)
-                #     
-                #     # Visualize pointcloud on the image with objects
-                #     if self.visualize:
-                #         in_BB_XYZ = point_cloud_XYZ[in_BB_ind]
-                #         for idx, pt in enumerate(img_pts[in_BB_ind]):
-                #             dist = np.linalg.norm(in_BB_XYZ[idx])
-                #             color = depth_color(dist)
-                #             cv2.circle(result[1], tuple(pt), 1, color)
+                    d_md = distance2object(in_BB_XYZ, method="mean_dist")
+                    d_mz = distance2object(in_BB_XYZ, method="mean_z")
+                    d_med = distance2object(in_BB_XYZ, method="median_dist")
+                    d_mez = distance2object(in_BB_XYZ, method="median_z")
 
-                scale_percent = 100 # percent of original size
-                width = int(cv_image.shape[1] * scale_percent / 100)
-                height = int(cv_image.shape[0] * scale_percent / 100)
-                dim = (width, height)
+                    print("d_md : %.4f  , d_mz : %.4f, d_med : %.4f, d_mez : %.4f " % (d_md, d_mz, d_med, d_mez))
 
-                # result[1] = cv2.resize(result[1], dim, interpolation = cv2.INTER_AREA)
+                    # Visualize pointcloud on the image with objects
+                    if self.visualize and not self.visualize_all_points:
+                        for idx, pt in enumerate(img_pts[in_BB_ind]):
+                            dist = np.linalg.norm(in_BB_XYZ[idx])
+                            color = depth_color(dist)
+                            cv2.circle(result[1], tuple(pt), 1, color)
 
-                cv2.imshow("result", cv2.resize(result[1], dim, interpolation = cv2.INTER_AREA))
-                cv2.waitKey(1)
+                self.out_image_pub.publish(self.cv_bridge.cv2_to_imgmsg(result[1], 'bgr8'))
 
+        self.camera_info_sub = rospy.Subscriber(self.camera_info_topic , CameraInfo, self.image_info_callback) 
         self.synchronizer.registerCallback(callback)
         rospy.spin()
-
-
 
 if __name__ == '__main__':
 
     node = Node()
     print("Detection started")
-    node.run3()
+    node.run()
     

@@ -2,13 +2,14 @@ import numpy as np
 import cv2
 
 
-def points_in_BB(object, points2D, ind):
+def points_in_BB(object, ind, points2D):
     """
            
     Args:
         object          : object infos in Pandas data frame
+        ind             : index of the detected object in Pandas data frame
         points2D        : lidar points inside bounding box on image
-        points3D        : lidar points inside bounding box in 3D
+        
     
     Returns:
         on_object       : indices of points inside the BB
@@ -21,18 +22,25 @@ def points_in_BB(object, points2D, ind):
 
     return inside_BB
 
-def points_on_object(object, points2D, points3D):
+def distance2object(points3D, method="mean_dist"):
     """
-           
     Args:
-        object          : object infos in Pandas data frame
-        points2D        : lidar points inside bounding box on image
         points3D        : lidar points inside bounding box in 3D
+        method          : the way to calculate points on the 
     
     Returns:
-        object_points   : lidar points on the object in 3D  
-
+        distance        : distance to object 
     """
 
-    inside_BB = points_in_BB(object, points2D)
-    inside_BB_3D = points3D[inside_BB]
+    if method == "mean_dist":
+        distance = np.mean(np.linalg.norm(points3D, axis=1))
+    elif method == "mean_z":
+        distance = np.mean(points3D[:,2])
+    elif method == "median_dist":
+        distance = np.median(np.linalg.norm(points3D, axis=1))
+    elif method == "median_z":
+        distance = np.median(points3D[:,2])
+
+    return distance
+
+

@@ -25,6 +25,8 @@ class ObjectDetector:
             self.detector.conf = self.confident
             self.detector.iou = self.iou
             self.detector.classes = self.classes
+
+            
         elif self.architecture == 'detectron':
             
             if self.device == 'cpu':
