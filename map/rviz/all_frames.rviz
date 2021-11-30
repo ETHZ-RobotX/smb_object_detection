@@ -6,7 +6,6 @@ Panels:
       Expanded:
         - /Global Options1
         - /Status1
-        - /RobotModel1/Status1
         - /RobotModel1/Links1
         - /TF1/Frames1
         - /TF1/Tree1
@@ -204,8 +203,6 @@ Visualization Manager:
           Value: true
         init_odom_source:
           Value: true
-        leica_pos:
-          Value: true
         lidar_mount_link:
           Value: true
         map:
@@ -230,13 +227,7 @@ Visualization Manager:
           Value: true
         rslidar_base_link:
           Value: true
-        tag_0:
-          Value: true
-        tag_14:
-          Value: true
         top:
-          Value: true
-        world:
           Value: true
       Marker Alpha: 1
       Marker Scale: 1
@@ -266,10 +257,7 @@ Visualization Manager:
                 blackfly_right_link:
                   blackfly_right_optical_link:
                     output_camera:
-                      tag_0:
-                        {}
-                      tag_14:
-                        {}
+                      {}
                 imu_link:
                   imu:
                     {}
@@ -375,8 +363,7 @@ Visualization Manager:
       Marker Topic: /tag_detections_marker
       Name: MarkerArray
       Namespaces:
-        0: true
-        14: true
+        {}
       Queue Size: 100
       Value: true
     - Alpha: 1
@@ -406,6 +393,14 @@ Visualization Manager:
       Unreliable: false
       Use Fixed Frame: true
       Use rainbow: true
+      Value: true
+    - Class: rviz/MarkerArray
+      Enabled: true
+      Marker Topic: /object
+      Name: MarkerArray
+      Namespaces:
+        {}
+      Queue Size: 100
       Value: true
   Enabled: true
   Global Options:
@@ -459,4 +454,4 @@ Window Geometry:
   QMainWindow State: 000000ff00000000fd00000001000000000000021100000234fc0200000001fb000000100044006900730070006c006100790073010000003d00000234000000c900ffffff000002690000023400000004000000040000000800000008fc0000000100000002000000010000000a0054006f006f006c00730100000000ffffffff0000000000000000
   Width: 1152
   X: 662
-  Y: 54
+  Y: 17

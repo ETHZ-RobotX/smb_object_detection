@@ -72,7 +72,7 @@ class Map:
         self.april_m_pos[str(id)] = np.mean(self.april_pos[str(id)], axis=0)
 
     
-    def getStats(self):
+    def dumpStats(self):
        
         now  = datetime.now()
         now  = now.strftime("%H_%M_%S")

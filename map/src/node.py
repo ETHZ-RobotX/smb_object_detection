@@ -94,7 +94,6 @@ def point_cloud_(points, parent_frame):
         data=data
     )
 
-
 def tags(tag, tf_buffer):
     tag_frame_name = "tag_" + str(tag)
 
@@ -106,7 +105,6 @@ def tags(tag, tf_buffer):
     except:
         print(tag_frame_name, " is not in fov")
     # print(transform)
-
 
 IDs = [0,1,2,3,4,5,6,7,8,9,14,17]
 
@@ -209,7 +207,7 @@ class Node:
         self.lidar_pub.publish(msg)
 
     def save_stats(self):
-        self.mapper.getStats()
+        self.mapper.dumpStats()
 
         markers = MarkerArray()
         for id in IDs:

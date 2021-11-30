@@ -14,7 +14,7 @@
     <param name="input_camera_namespace" value="versavis"/>      
     <param name="input_camera_info_from_ros_params" value = "true"/>    
     <param name="scale" value="$(arg scale)"/>
-    <param name="output_camera_info_source" value="match_input"/>   <!--auto_generated,match_input--> 
+    <param name="output_camera_info_source" value="auto_generated"/>   <!--auto_generated,match_input--> 
     <param name="publish_tf" value="false"/>
     <rosparam file="$(arg calib_path)"/>
     <remap from="input/image" to="$(arg input_camera_name)/image_color"/>
@@ -44,7 +44,7 @@
     <param name="classes" value='[1]'/>
   </node>
   
-  <arg name="rosbag_path" default="/home/oilter/Courses/SemesterProject/RosBags/Objects/2021-11-11-16-33-40_bike_17_smb.bag"/>
+  <arg name="rosbag_path" default="/home/oilter/Courses/SemesterProject/RosBags/Objects/2021-11-11-16-03-38_bike_5_smb.bag"/>
   <node pkg="rosbag" type="play" name="player" output="screen" args="-d 5 -r 0.5 $(arg rosbag_path)" required = "false"/>
 
 

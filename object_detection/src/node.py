@@ -14,7 +14,7 @@ import tf2_ros
 
 from object_detection.objectdetector import ObjectDetector
 from object_detection.reproject import ImageHandler
-from object_detection.modelextractor import *
+from object_detection.objectlocalizer import *
 
 
 def hsv2rgb(h, s, v):
@@ -37,7 +37,6 @@ def hsv2rgb(h, s, v):
     elif hi == 5: r, g, b = v, p, q
     r, g, b = int(r * 255), int(g * 255), int(b * 255)
     return r, g, b
-
 
 def depth_color(val, min_d=0, max_d=20):
     """
@@ -92,7 +91,6 @@ def marker_(ns, marker_id, pos, color, type="all"):
         
     return marker
 
-
 def transformstamped_(frame_id, child_id, pose, rot):
     t = TransformStamped()
 
@@ -141,27 +139,36 @@ class Node:
         self.marker_pub                     = rospy.Publisher(self.obj_marker_topic , MarkerArray, queue_size=10)
 
         # Verify the location with AprilTag
-        self.tf_buffer                      = tf2_ros.Buffer(rospy.Duration(1.0)) #tf buffer length
+        self.tf_buffer                      = tf2_ros.Buffer(rospy.Duration(0.5)) #tf buffer length
         self.tf_listener                    = tf2_ros.TransformListener(self.tf_buffer)
         self.tag_topic                      = rospy.get_param('~tag_topic', '/tag_detections')
         self.tag_pos                        = np.empty((0,3))
         self.mean_tag_pos                   = None
         self.obj_id                         = 0
 
-        # Detector related
-        self.detector_cfg = {}
-        self.detector_cfg['architecture']   = rospy.get_param('~architecture', 'yolo')
-        self.detector_cfg['model']          = rospy.get_param('~model', 'yolov5n')
-        self.detector_cfg['checkpoint']     = rospy.get_param('~checkpoint', None)
-        self.detector_cfg['device']         = rospy.get_param('~device', 'cpu')
-        self.detector_cfg['confident']      = rospy.get_param('~confident', 0.5)
-        self.detector_cfg['iou']            = rospy.get_param('~iou', 0.45)
+        # Detection related 
+
+        self.multiple_instance              = rospy.get_param('~multiple_instance', False)
+
+
+        # Object Detector related
+        self.objectdetector_cfg = {}
+        self.objectdetector_cfg['architecture']   = rospy.get_param('~architecture', 'yolo')
+        self.objectdetector_cfg['model']          = rospy.get_param('~model', 'yolov5n')
+        self.objectdetector_cfg['checkpoint']     = rospy.get_param('~checkpoint', None)
+        self.objectdetector_cfg['device']         = rospy.get_param('~device', 'cpu')
+        self.objectdetector_cfg['confident']      = rospy.get_param('~confident', 0.5)
+        self.objectdetector_cfg['iou']            = rospy.get_param('~iou', 0.45)
         classes                             = rospy.get_param('~classes',  None)
         if classes != 'None':
             classes = np.array([[int(x.strip(' ')) for x in ss.lstrip(' [,').split(', ')] for ss in classes.rstrip(']').split(']')])
-            self.detector_cfg['classes'] = list(classes.flatten())
+            self.objectdetector_cfg['classes'] = list(classes.flatten())
         else:
-            self.detector_cfg['classes'] = None
+            self.objectdetector_cfg['classes'] = None
+        
+        # Object Localizaer related 
+        self.objectlocalizer_cfg = {}
+        self.objectlocalizer_cfg['model_method']   = rospy.get_param('~model_method', 'mean') # same class multiple instance
 
         # Camera Params
         self.imagehandler                   = ImageHandler()
@@ -184,8 +191,9 @@ class Node:
 
         self.imagehandler.set_transformationparams(R_camera_lidar,t_camera_lidar)
         
-        self.detector                       = ObjectDetector(self.detector_cfg)
-        print("Detector is set")
+        self.objectlocalizer     = ObjectLocalizer(self.objectlocalizer_cfg)
+        self.objectdetector      = ObjectDetector(self.objectdetector_cfg)
+        print("Object Detector is set")
 
     def image_info_callback(self, camera_info):
         h = camera_info.height
@@ -199,8 +207,6 @@ class Node:
         
         for tag in data.detections:
             # print("Tag ",tag.id[0]," has been seen." )
-
-
             transform = self.tf_buffer.lookup_transform('map',
                                         'tag_' + str(tag.id[0]), #source frame
                                         rospy.Time(0),
@@ -220,26 +226,44 @@ class Node:
 
                 # transform the pointcloud msg to numpy array and remove nans
                 point_cloud_XYZ = ros_numpy.point_cloud2.pointcloud2_to_xyz_array(lidar_msg)
+
+                # translate and project PointCloud onto the Image
                 point_cloud_XYZ = self.imagehandler.translatePoints(point_cloud_XYZ)
                 img_pts, indices = self.imagehandler.projectPointsOnImage(point_cloud_XYZ)
                 
+                # 3D Lidar points that are inside the image frame  
                 point_cloud_XYZ = point_cloud_XYZ[indices]
 
-                # Detect objects 
-                result = self.detector.detect(cv_image, return_image=True)
+                # Detect objects in image
+                result = self.objectdetector.detect(cv_image, return_image=True)
 
+                # If no multiple instance for every class is allowed,
+                # pick the one with highest confidance for every class.
+                if not self.multiple_instance:
+                    detected_objects = []
+                    row_to_delete    = []
+                    for i in range(len(result[0])):
+                        if result[0]['class'][i] in detected_objects:
+                            row_to_delete.append(i)
+                        else:
+                            detected_objects.append(result[0]['class'][i])
+                    
+                    result[0] = result[0].drop(row_to_delete, axis=0)
+
+                # Visualize all Lidar points that are inside the image frame
                 if self.visualize and self.visualize_all_points:
                     for idx, pt in enumerate(img_pts):
                         dist = np.linalg.norm(point_cloud_XYZ[idx])
                         color = depth_color(dist)
                         cv2.circle(result[1], tuple(pt), 1, color)
 
+
+                object_poses, indices_list = self.objectlocalizer.localize(result[0], img_pts,  point_cloud_XYZ)
+
+                # For every detected image object
                 for i in range(len(result[0])):
-                    #Find the points that are inside the bounding box of the object
-                    in_BB_ind= points_in_BB(result[0], i, img_pts)
-                    in_BB_XYZ = point_cloud_XYZ[in_BB_ind]
                     
-                    xyz = objectpos(in_BB_XYZ, method="mean")
+                    xyz = object_poses[i]
 
                     # transformstamped_("blackfly_right_optical_link", "object", xyz, [0,0,0,1])
                     self.TF_br.sendTransform(transformstamped_("blackfly_right_optical_link", "object", xyz, [0,0,0,1]))
@@ -256,17 +280,10 @@ class Node:
                     self.marker_pub.publish(markers)                
 
                     self.obj_id += 1
-
-
-                    # d_md = distance2object(in_BB_XYZ, method="mean_dist")
-                    # d_mz = distance2object(in_BB_XYZ, method="mean_z")
-                    # d_med = distance2object(in_BB_XYZ, method="median_dist")
-                    # d_mez = distance2object(in_BB_XYZ, method="median_z")
-                    # print("d_md : %.4f  , d_mz : %.4f, d_med : %.4f, d_mez : %.4f " % (d_md, d_mz, d_med, d_mez))
-
+                    in_BB_XYZ = point_cloud_XYZ[indices_list[i]]
                     # Visualize pointcloud on the image with objects
                     if self.visualize and not self.visualize_all_points:
-                        for idx, pt in enumerate(img_pts[in_BB_ind]):
+                        for idx, pt in enumerate(img_pts[indices_list[i]]):
                             dist = np.linalg.norm(in_BB_XYZ[idx])
                             color = depth_color(dist)
                             cv2.circle(result[1], tuple(pt), 1, color)
