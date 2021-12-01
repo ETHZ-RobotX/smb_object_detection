@@ -1,17 +1,20 @@
 Panels:
   - Class: rviz/Displays
-    Help Height: 78
+    Help Height: 0
     Name: Displays
     Property Tree Widget:
       Expanded:
         - /Global Options1
         - /Status1
         - /RobotModel1/Links1
-        - /TF1/Frames1
-        - /TF1/Tree1
         - /MarkerArray1/Namespaces1
       Splitter Ratio: 0.5841924548149109
-    Tree Height: 425
+    Tree Height: 347
+  - Class: rviz/Views
+    Expanded:
+      - /Current View1
+    Name: Views
+    Splitter Ratio: 0.5
 Preferences:
   PromptSaveOnExit: true
 Toolbars:
@@ -152,7 +155,7 @@ Visualization Manager:
       Visual Enabled: true
     - Class: rviz/TF
       Enabled: true
-      Frame Timeout: 15
+      Frame Timeout: 1
       Frames:
         All Enabled: false
         LF_WHEEL:
@@ -209,6 +212,8 @@ Visualization Manager:
           Value: true
         mono_link:
           Value: true
+        object:
+          Value: true
         odom:
           Value: true
         odom_source:
@@ -226,6 +231,8 @@ Visualization Manager:
         rslidar:
           Value: true
         rslidar_base_link:
+          Value: true
+        tag_14:
           Value: true
         top:
           Value: true
@@ -256,8 +263,11 @@ Visualization Manager:
                     {}
                 blackfly_right_link:
                   blackfly_right_optical_link:
-                    output_camera:
+                    object:
                       {}
+                    output_camera:
+                      tag_14:
+                        {}
                 imu_link:
                   imu:
                     {}
@@ -378,7 +388,7 @@ Visualization Manager:
       Color: 255; 255; 255
       Color Transformer: Intensity
       Decay Time: 0
-      Enabled: true
+      Enabled: false
       Invert Rainbow: false
       Max Color: 255; 255; 255
       Min Color: 0; 0; 0
@@ -393,14 +403,26 @@ Visualization Manager:
       Unreliable: false
       Use Fixed Frame: true
       Use rainbow: true
-      Value: true
+      Value: false
     - Class: rviz/MarkerArray
       Enabled: true
       Marker Topic: /object
       Name: MarkerArray
       Namespaces:
-        {}
+        object: true
       Queue Size: 100
+      Value: true
+    - Class: rviz/Image
+      Enabled: true
+      Image Topic: /versavis/cam0/objects
+      Max Value: 1
+      Median window: 5
+      Min Value: 0
+      Name: Image
+      Normalize Range: true
+      Queue Size: 2
+      Transport Hint: raw
+      Unreliable: false
       Value: true
   Enabled: true
   Global Options:
@@ -424,34 +446,46 @@ Visualization Manager:
   Value: true
   Views:
     Current:
-      Class: rviz/Orbit
-      Distance: 15.16808795928955
+      Angle: 0
+      Class: rviz/TopDownOrtho
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
-      Field of View: 0.7853981852531433
-      Focal Point:
-        X: 4.475844860076904
-        Y: 0.08567094802856445
-        Z: 2.1171247959136963
-      Focal Shape Fixed Size: true
-      Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.5697972774505615
+      Scale: 89.47207641601562
       Target Frame: <Fixed Frame>
-      Yaw: 3.1190385818481445
-    Saved: ~
+      X: 5.964376926422119
+      Y: 0.6354061365127563
+    Saved:
+      - Angle: 0
+        Class: rviz/TopDownOrtho
+        Enable Stereo Rendering:
+          Stereo Eye Separation: 0.05999999865889549
+          Stereo Focal Distance: 1
+          Swap Stereo Eyes: false
+          Value: false
+        Invert Z Axis: false
+        Name: TopDownOrtho
+        Near Clip Distance: 0.009999999776482582
+        Scale: 248.7861328125
+        Target Frame: <Fixed Frame>
+        X: 11.977428436279297
+        Y: 1.3954198360443115
 Window Geometry:
   Displays:
     collapsed: false
-  Height: 654
+  Height: 1043
   Hide Left Dock: false
   Hide Right Dock: false
-  QMainWindow State: 000000ff00000000fd00000001000000000000021100000234fc0200000001fb000000100044006900730070006c006100790073010000003d00000234000000c900ffffff000002690000023400000004000000040000000800000008fc0000000100000002000000010000000a0054006f006f006c00730100000000ffffffff0000000000000000
-  Width: 1152
-  X: 662
-  Y: 17
+  Image:
+    collapsed: false
+  QMainWindow State: 000000ff00000000fd00000001000000000000037c000003b9fc0200000006fb000000100044006900730070006c006100790073010000003d00000198000000c900fffffffb0000000a00560069006500770073000000010c000000a4000000a400fffffffb0000000a0049006d0061006700650000000138000002be0000000000000000fb0000000c00430061006d0065007200610000000161000001c30000000000000000fb0000000c00430061006d00650072006100000001f1000001330000000000000000fb0000000a0049006d00610067006501000001db0000021b0000001600ffffff000003fe000003b900000004000000040000000800000008fc0000000100000002000000010000000a0054006f006f006c00730100000000ffffffff0000000000000000
+  Views:
+    collapsed: false
+  Width: 1920
+  X: 0
+  Y: 0

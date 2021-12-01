@@ -33,7 +33,7 @@
     <param name="camera_info_callback_sleep" value="20.0"/>
     <param name="visualize" value='true'/>
     <param name="visualize_all_points" value='false'/>
-    <param name="out_image_pub_topic" value='$(arg input_camera_name)/undistorted/objects'/>
+    <param name="out_image_pub_topic" value='$(arg input_camera_name)/objects'/>
 
     <!--Object detection related-->
     <param name="architecture" value='yolo'/>

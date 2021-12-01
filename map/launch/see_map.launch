@@ -8,8 +8,8 @@
     output="screen"/>
 
 
-  <arg name="rosbag_path" default="$(find map)/mapping_stats_11_24_2021_08_47.bag"/>
-  <node pkg="rosbag" type="play" name="player" output="screen" args="-d 5 -s 290.0 $(arg rosbag_path)" required = "false"/>
+  <arg name="rosbag_path" default="$(find map)/mapping_stats_11_30_2021_18_55.bag"/>
+  <node pkg="rosbag" type="play" name="player" output="screen" args="-d 5 $(arg rosbag_path)" required = "false"/>
 
 
 </launch>

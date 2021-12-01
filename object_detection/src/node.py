@@ -130,12 +130,12 @@ class Node:
         # Output related
         self.visualize                      = rospy.get_param('visualize', True)
         self.visualize_all_points           = rospy.get_param('~visualize_all_points', False)
-        self.out_image_pub_topic            = rospy.get_param('~out_image_pub_topic', "/versavis/cam0/undistorted/objects")
+        self.out_image_pub_topic            = rospy.get_param('~out_image_pub_topic', "/versavis/cam0/objects")
 
         self.out_image_pub                  = rospy.Publisher(self.out_image_pub_topic , Image, queue_size=5)
         self.TF_br                          = tf2_ros.StaticTransformBroadcaster()
 
-        self.obj_marker_topic               = rospy.get_param('obj_marker_topic', '/object')
+        self.obj_marker_topic               = rospy.get_param('~obj_marker_topic', '/object')
         self.marker_pub                     = rospy.Publisher(self.obj_marker_topic , MarkerArray, queue_size=10)
 
         # Verify the location with AprilTag
@@ -168,7 +168,7 @@ class Node:
         
         # Object Localizaer related 
         self.objectlocalizer_cfg = {}
-        self.objectlocalizer_cfg['model_method']   = rospy.get_param('~model_method', 'mean') # same class multiple instance
+        self.objectlocalizer_cfg['model_method']   = rospy.get_param('~model_method', 'histogram') # same class multiple instance
 
         # Camera Params
         self.imagehandler                   = ImageHandler()
@@ -210,7 +210,7 @@ class Node:
             transform = self.tf_buffer.lookup_transform('map',
                                         'tag_' + str(tag.id[0]), #source frame
                                         rospy.Time(0),
-                                        rospy.Duration(5.0)) #get the tf at first available time) #wait for 5 second
+                                        rospy.Duration(1)) #get the tf at first available time) #wait for 5 second
 
             xyz = np.array([transform.transform.translation.x, transform.transform.translation.y, transform.transform.translation.z ])
             self.tag_pos = np.vstack([self.tag_pos, xyz])
@@ -265,6 +265,9 @@ class Node:
                     
                     xyz = object_poses[i]
 
+                    if np.any(np.isnan(xyz)):
+                        continue
+
                     # transformstamped_("blackfly_right_optical_link", "object", xyz, [0,0,0,1])
                     self.TF_br.sendTransform(transformstamped_("blackfly_right_optical_link", "object", xyz, [0,0,0,1]))
                     
@@ -287,8 +290,9 @@ class Node:
                             dist = np.linalg.norm(in_BB_XYZ[idx])
                             color = depth_color(dist)
                             cv2.circle(result[1], tuple(pt), 1, color)
-
-                self.out_image_pub.publish(self.cv_bridge.cv2_to_imgmsg(result[1], 'bgr8'))
+                img_msg = self.cv_bridge.cv2_to_imgmsg(result[1], 'bgr8')
+                img_msg.header.frame_id = "blackfly_right_optical_link"
+                self.out_image_pub.publish(img_msg)
 
         self.camera_info_sub = rospy.Subscriber(self.camera_info_topic , CameraInfo, self.image_info_callback)
         self.tag_sub         = rospy.Subscriber(self.tag_topic , AprilTagDetectionArray, self.tag_callback) 

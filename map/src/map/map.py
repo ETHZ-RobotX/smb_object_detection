@@ -34,7 +34,7 @@ class Map:
 
         self.april_ids  = ["0", "1", "2", "3", "4", \
                            "5", "6", "7", "8", "9", \
-                           "14", "17"]
+                           "13", "14", "17"]
 
         self.now  = time
         self.file_name = path
@@ -87,6 +87,7 @@ class Map:
                 f.write("Tag " + str(id) + ", color: "+ str(self.april_color[str(id)]) + "\n")
                 f.write("Mean: " + str(np.mean(self.april_pos[str(id)], axis=0)) + "\n")
                 f.write("Median: " + str(np.median(self.april_pos[str(id)], axis=0)) + "\n")
+                f.write("Std: " + str(np.std(self.april_pos[str(id)], axis=0)) + "\n")
                 f.write("Std: " + str(np.std(self.april_pos[str(id)], axis=0)) + "\n")
                 f.write("------------------------------------------------------------- \n")
 

@@ -1,4 +1,6 @@
 import numpy as np
+import matplotlib.pyplot as plt
+from scipy.signal import find_peaks
 import cv2
 
 from object_detection.object import Object
@@ -33,8 +35,32 @@ class ObjectLocalizer:
                                      (self.points2D[:,1] <= self.objects_BB['ymax'][index]))
         inside_BB = np.argwhere(np.logical_and(inside_BB_x, inside_BB_y)).flatten()
 
-        return inside_BB
+        center = np.array([(self.objects_BB['xmin'][index]+self.objects_BB['xmax'][index])/2.0, \
+                  (self.objects_BB['ymin'][index]+self.objects_BB['ymax'][index])/2.0 ])
+
+        center_ind = (np.abs(self.points2D - center)).argmin()
+
+        return inside_BB, center_ind
     
+    def method_histogram(self,in_BB_3D):
+        hist, bin_edges = np.histogram(in_BB_3D[:,2], 100)
+        bin_edges = bin_edges[:-1]
+        hist = np.insert(hist, 0, 0)
+        bin_edges = np.insert(bin_edges, 0, 0)
+        peaks, _ = find_peaks(hist)
+        
+        plt.plot(bin_edges, hist)
+        plt.plot(bin_edges[peaks], hist[peaks], "x")
+        plt.savefig('/home/oilter/Downloads/foo.png')
+        plt.close()
+
+        inside_peak = np.logical_and((in_BB_3D[:,2] >= bin_edges[peaks[0]]), \
+                                     (in_BB_3D[:,2] <= bin_edges[peaks[0]+1]))
+        
+        return np.median(in_BB_3D[inside_peak, :], axis=0)
+        
+        
+
     def get_object_pos(self, index):
         """        
         Args:
@@ -44,34 +70,39 @@ class ObjectLocalizer:
             pos             : position of the object acc. camera frame
         """
 
-        indices = self.points_in_BB(index)
-        in_BB_3D = self.points3D[indices]
+        indices , center_ind= self.points_in_BB(index)
+        in_BB_3D = self.points3D[indices, :]
 
         if self.model_method == "mean":
             pos = np.mean(in_BB_3D, axis=0)
+        elif self.model_method == "median":
+            pos = np.median(in_BB_3D, axis=0)
+        elif self.model_method == "centre":
+            pos = self.points3D[center_ind]
+        elif self.model_method == "histogram":
+            pos = self.method_histogram(in_BB_3D)
         
         # TODO: Add more method
         # elif method == "median_dist":
         #     distance = np.median(np.linalg.norm(points3D, axis=1))
 
-
         return pos, indices
 
-    def calc_similarity(self):
-        # TODO: Implement
-        a = 0
-
-    def localize(self, objects_BB, points2D, points3D):
+    def localize(self, objects_BB, points2D, points3D, method=None):
         """
         Args:
             objects_BB     : 2D object detection results in Panda Dataframe 
             points2D       : 2D Point cloud in camera frame on the image
             points3D       : 3D Point cloud in camera frame 
+            method         : method to calculate position of object
         
         Returns:
             pos             : nx3 numpy array, position of the objects acc. camera frame
         
         """
+        if method is not None:
+            self.model_method = method
+
         self.save_scene(objects_BB, points2D, points3D)
         object_poses = np.empty((0,3))
         indices_list = []

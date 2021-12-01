@@ -46,15 +46,15 @@ def marker_(ns, marker_id, pos, color, type="all"):
     if type=="mean":
         marker.id = 10000
 
-        marker.scale.x = 0.1
-        marker.scale.y = 0.1
+        marker.scale.x = 0.01
+        marker.scale.y = 0.01
         marker.scale.z = 1.0
     else:
         
         marker.id = marker_id
         
-        marker.scale.x = 0.1
-        marker.scale.y = 0.1
+        marker.scale.x = 0.01
+        marker.scale.y = 0.01
         marker.scale.z = 0.3
 
 
@@ -106,7 +106,7 @@ def tags(tag, tf_buffer):
         print(tag_frame_name, " is not in fov")
     # print(transform)
 
-IDs = [0,1,2,3,4,5,6,7,8,9,14,17]
+IDs = [0,1,2,3,4,5,6,7,8,9,13,14,17]
 
 class Node:
     def __init__(self):
@@ -120,12 +120,15 @@ class Node:
         self.tf_buffer = tf2_ros.Buffer(rospy.Duration(1.0)) #tf buffer length
         self.tf_listener = tf2_ros.TransformListener(self.tf_buffer)
 
+        print(self.log_period)
+
         now  = datetime.now()
         now  = now.strftime("%m_%d_%Y_%H_%M")
         file_dir = os.path.join(self.output_dir, "mapping_stats_" + now)
 
         self.mapper = Map("Z", file_dir + ".txt", now )
-        self.bag = rosbag.Bag(file_dir+'.bag', 'w')
+        if self.log_period > 0:
+            self.bag = rosbag.Bag(file_dir+'.bag', 'w')
 
         # Publisher
         self.pc_map_pub                     = rospy.Publisher(self.pc_map_topic + '_2D', PointCloud2, queue_size=1)
@@ -136,7 +139,8 @@ class Node:
 
     def pc_map_callback(self, data):
         # if self.mapper.map_2D is None:
-        self.bag.write('/icp_node/icp_map', data)
+        if self.log_period > 0:
+            self.bag.write('/icp_node/icp_map', data)
         point_cloud = ros_numpy.point_cloud2.pointcloud2_to_xyz_array(data)
         self.mapper.buildMap(point_cloud)
 
@@ -144,11 +148,13 @@ class Node:
         pts[:,:3] = self.mapper.map_2D
 
         msg = point_cloud_(pts,'map')
-        self.bag.write('/icp_node/icp_map_2D', msg)
+        if self.log_period > 0:
+            self.bag.write('/icp_node/icp_map_2D', msg)
         while True:
             self.pc_map_pub.publish(msg)
-            self.bag.write('/icp_node/icp_map', data)
-            self.bag.write('/icp_node/icp_map_2D', msg)
+            if self.log_period > 0:
+                self.bag.write('/icp_node/icp_map', data)
+                self.bag.write('/icp_node/icp_map_2D', msg)
             rospy.sleep(self.log_period)
             
 
@@ -179,7 +185,7 @@ class Node:
             markers.markers.append(marker_(str(tag.id[0]),id, m_pos, color, type="mean"))
             self.marker_pub.publish(markers)
 
-        if int(rospy.get_time()) % self.log_period == 0 and int(rospy.get_time()) != 0:
+        if self.log_period > 0 and int(rospy.get_time()) % self.log_period == 0 and int(rospy.get_time()) != 0:
             self.save_stats()
             
 
@@ -239,7 +245,9 @@ if __name__ == '__main__':
         node = Node()
         print("Mapping started")
         node.run()
-        node.save_stats()
+        if node.log_period > 0:
+            node.save_stats()
+            node.bag.close()
         print("End of Mapping")
-        node.bag.close()
+        
     

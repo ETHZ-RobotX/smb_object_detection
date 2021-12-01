@@ -12,9 +12,10 @@
     <param name="tag_topic" value='/tag_detections'/>
     <param name="node_name" value='map'/>
     <param name="output_dir" value='/home/oilter/Courses/SemesterProject/catkin_ws/src/map'/>
+    <param name="log_period" value='0'/>
   </node>
   
   <arg name="rosbag_path" default="/home/oilter/Courses/SemesterProject/RosBags/Mapping.bag"/>
-  <node pkg="rosbag" type="play" name="player" output="screen" args="-d 5 -r 0.8 $(arg rosbag_path)" required = "true"/>
+  <node pkg="rosbag" type="play" name="player" output="screen" args="-d 3 -r 0.5 $(arg rosbag_path)" required = "false"/>
 
 </launch>
