@@ -13,13 +13,15 @@
     <param name="scale" value="$(arg scale)"/>
     <param name="output_camera_info_source" value="auto_generated"/> <!--auto_generated,match_input--> 
     <param name="publish_tf" value="false"/>
+    <param name="output_frame" value="blackfly_right_optical_link"/>
     <rosparam file="$(arg calib_path)"/>
     <remap from="input/image" to="$(arg input_camera_name)/image_color"/>
     <remap from="output/image" to="$(arg input_camera_name)/undistorted"/>
     <remap from="output/camera_info" to="$(arg input_camera_name)/undistorted/info"/>
+    
   </node>
 
-  <node pkg="tf2_ros" type="static_transform_publisher" name="apriltags_in_camera_frame" args="0 0 0 0 0 0 blackfly_right_optical_link output_camera" />
+  <!--node pkg="tf2_ros" type="static_transform_publisher" name="apriltags_in_camera_frame" args="0 0 0 0 0 0 blackfly_right_optical_link output_camera" /-->
   
   <arg name="launch_prefix" default="" /> <!-- set to value="gdbserver localhost:10000" for remote debugging -->
   <arg name="node_namespace" default="apriltag_ros_continuous_node" />

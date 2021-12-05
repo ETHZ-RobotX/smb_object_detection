@@ -395,7 +395,8 @@ AprilTagDetectionArray TagDetector::detectTags (
                                                  detection_names[i]));
     }
   }
-
+  // apriltag_detections_destroy(detections_);
+  // detections_ = NULL;
   return tag_detection_array;
 }
 

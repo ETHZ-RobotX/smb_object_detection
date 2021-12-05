@@ -84,11 +84,15 @@ class Map:
             f.write("\n")
 
             for id in self.april_ids:
+                
+                if self.april_m_pos[str(id)] is None:
+                    continue
+
                 f.write("Tag " + str(id) + ", color: "+ str(self.april_color[str(id)]) + "\n")
                 f.write("Mean: " + str(np.mean(self.april_pos[str(id)], axis=0)) + "\n")
                 f.write("Median: " + str(np.median(self.april_pos[str(id)], axis=0)) + "\n")
                 f.write("Std: " + str(np.std(self.april_pos[str(id)], axis=0)) + "\n")
-                f.write("Std: " + str(np.std(self.april_pos[str(id)], axis=0)) + "\n")
+                f.write("Max Change: " + str((self.april_pos[str(id)]-self.april_m_pos[str(id)]).max(axis=0)) + "\n")
                 f.write("------------------------------------------------------------- \n")
 
 

@@ -16,6 +16,11 @@ from object_detection.objectdetector import ObjectDetector
 from object_detection.reproject import ImageHandler
 from object_detection.objectlocalizer import *
 
+from threading import Thread
+from time import sleep, perf_counter
+
+import warnings
+warnings.filterwarnings("ignore")
 
 def hsv2rgb(h, s, v):
     h = float(h)
@@ -38,7 +43,7 @@ def hsv2rgb(h, s, v):
     r, g, b = int(r * 255), int(g * 255), int(b * 255)
     return r, g, b
 
-def depth_color(val, min_d=0, max_d=20):
+def depth_color(val, min_d=0.2, max_d=20):
     """
     print Color(HSV's H value) corresponding to distance(m)
     close distance = red , far distance = blue
@@ -91,10 +96,10 @@ def marker_(ns, marker_id, pos, color, type="all"):
         
     return marker
 
-def transformstamped_(frame_id, child_id, pose, rot):
+def transformstamped_(frame_id, child_id, time, pose, rot):
     t = TransformStamped()
 
-    t.header.stamp = rospy.Time.now()
+    t.header.stamp = time
     t.header.frame_id = frame_id
     t.child_frame_id = child_id
     t.transform.translation.x = pose[0]
@@ -107,7 +112,6 @@ def transformstamped_(frame_id, child_id, pose, rot):
 
     return t
 
-
 class Node:
     def __init__(self):
 
@@ -119,37 +123,46 @@ class Node:
         self.lidar_topic                    = rospy.get_param('~lidar_topic', '/rslidar_points')
 
         self.camera_info_callback_sleep     = rospy.get_param('~camera_info_callback_sleep', 20)
-        
+
+        self.optical_frame                  = rospy.get_param('~optical_frame', 'blackfly_right_optical_link')
+        self.map_frame                      = rospy.get_param('~map_frame', 'map')
+
         self.camera_sub                     = message_filters.Subscriber(self.camera_topic, Image)
         self.lidar_sub                      = message_filters.Subscriber(self.lidar_topic, PointCloud2)
 
         self.cv_bridge                      = CvBridge()
 
-        self.synchronizer                   = message_filters.ApproximateTimeSynchronizer([self.camera_sub, self.lidar_sub], 1, 0.05, reset=True)
+        self.synchronizer                   = message_filters.ApproximateTimeSynchronizer([self.camera_sub, self.lidar_sub], 5, 0.05, reset=True)
+
+        self.validate                       = rospy.get_param('~validate', True)
         
         # Output related
         self.visualize                      = rospy.get_param('visualize', True)
         self.visualize_all_points           = rospy.get_param('~visualize_all_points', False)
-        self.out_image_pub_topic            = rospy.get_param('~out_image_pub_topic', "/versavis/cam0/objects")
-
-        self.out_image_pub                  = rospy.Publisher(self.out_image_pub_topic , Image, queue_size=5)
+        
+        if self.visualize:
+            self.out_image_pub_topic            = rospy.get_param('~out_image_pub_topic', "/versavis/cam0/objects")
+            self.out_image_pub                  = rospy.Publisher(self.out_image_pub_topic , Image, queue_size=5)
+        
         self.TF_br                          = tf2_ros.StaticTransformBroadcaster()
 
+        self.create_obj_marker              = rospy.get_param('~create_obj_marker', 'true')
         self.obj_marker_topic               = rospy.get_param('~obj_marker_topic', '/object')
-        self.marker_pub                     = rospy.Publisher(self.obj_marker_topic , MarkerArray, queue_size=10)
 
-        # Verify the location with AprilTag
-        self.tf_buffer                      = tf2_ros.Buffer(rospy.Duration(0.5)) #tf buffer length
-        self.tf_listener                    = tf2_ros.TransformListener(self.tf_buffer)
-        self.tag_topic                      = rospy.get_param('~tag_topic', '/tag_detections')
-        self.tag_pos                        = np.empty((0,3))
-        self.mean_tag_pos                   = None
-        self.obj_id                         = 0
+        if self.create_obj_marker:
+            self.marker_pub                     = rospy.Publisher(self.obj_marker_topic , MarkerArray, queue_size=10)
+
+        # Validate the location with AprilTag
+        if self.validate :
+            self.tf_buffer                      = tf2_ros.Buffer(rospy.Duration(2.0)) #tf buffer length
+            self.tf_listener                    = tf2_ros.TransformListener(self.tf_buffer)
+            self.tag_topic                      = rospy.get_param('~tag_topic', '/tag_detections')
+            self.tag_pos                        = np.empty((0,3))
+            self.mean_tag_pos                   = None
+            self.obj_id                         = 0
 
         # Detection related 
-
         self.multiple_instance              = rospy.get_param('~multiple_instance', False)
-
 
         # Object Detector related
         self.objectdetector_cfg = {}
@@ -159,7 +172,7 @@ class Node:
         self.objectdetector_cfg['device']         = rospy.get_param('~device', 'cpu')
         self.objectdetector_cfg['confident']      = rospy.get_param('~confident', 0.5)
         self.objectdetector_cfg['iou']            = rospy.get_param('~iou', 0.45)
-        classes                             = rospy.get_param('~classes',  None)
+        classes                                   = rospy.get_param('~classes',  None)
         if classes != 'None':
             classes = np.array([[int(x.strip(' ')) for x in ss.lstrip(' [,').split(', ')] for ss in classes.rstrip(']').split(']')])
             self.objectdetector_cfg['classes'] = list(classes.flatten())
@@ -168,7 +181,12 @@ class Node:
         
         # Object Localizaer related 
         self.objectlocalizer_cfg = {}
-        self.objectlocalizer_cfg['model_method']   = rospy.get_param('~model_method', 'histogram') # same class multiple instance
+        self.objectlocalizer_cfg['model_method']   = rospy.get_param('~model_method', 'hdbscan') # same class multiple instance
+
+        # By-products
+        self.object_detection_result        = None
+        self.pointcloud_on_image            = None      # 2D pointcloud on image with pixel coordinages 
+        self.pointcloud_in_image            = None      # 3D pointcloud in image frame
 
         # Camera Params
         self.imagehandler                   = ImageHandler()
@@ -184,7 +202,14 @@ class Node:
         R_camera_lidar = np.float64([ [-1.0000000, 0.0000000,  0.0000000],
                                         [0.0000000, 0.0000000, -1.0000000],
                                         [0.0000000, -1.0000000,  0.0000000] ])
+        # IMU correction was: 7.44614 deg (0.99789, 0.0518968, -0.021901, 0.0323034)
+        # [ x: 176.1699033, y: -2.3128941, z: -6.0314909 ]
+        # Correction of Lidar position
+        R = [ [ 0.9998379,  0.0180019,  0.0000000],
+              [-0.0180019,  0.9998379,  0.0000000],
+              [ 0.0000000,  0.0000000,  1.0000000]]
 
+        R_camera_lidar = np.matmul(R_camera_lidar,R)       
         t_camera_lidar = np.float64([-0.045, -0.293, -0.241])
 
         # -------- TODO: REMOVE HARDCODED PARAMS ---------------------------
@@ -194,6 +219,11 @@ class Node:
         self.objectlocalizer     = ObjectLocalizer(self.objectlocalizer_cfg)
         self.objectdetector      = ObjectDetector(self.objectdetector_cfg)
         print("Object Detector is set")
+    
+    def clear_by_products(self):
+        self.object_detection_result        = None
+        self.pointcloud_on_image            = None
+        self.pointcloud_in_image            = None 
 
     def image_info_callback(self, camera_info):
         h = camera_info.height
@@ -204,99 +234,124 @@ class Node:
         rospy.sleep(self.camera_info_callback_sleep)
 
     def tag_callback(self, data):
-        
         for tag in data.detections:
             # print("Tag ",tag.id[0]," has been seen." )
-            transform = self.tf_buffer.lookup_transform('map',
+            transform = self.tf_buffer.lookup_transform(self.map_frame,
                                         'tag_' + str(tag.id[0]), #source frame
                                         rospy.Time(0),
                                         rospy.Duration(1)) #get the tf at first available time) #wait for 5 second
 
             xyz = np.array([transform.transform.translation.x, transform.transform.translation.y, transform.transform.translation.z ])
             self.tag_pos = np.vstack([self.tag_pos, xyz])
-            self.mean_tag_pos = np.mean(self.tag_pos, axis=0)
+            # self.mean_tag_pos = np.mean(self.tag_pos, axis=0)
+            self.mean_tag_pos = xyz
 
 
     def run(self):
-        def callback(image_msg, lidar_msg):
-            # If Image Message is not empty 
-            if image_msg.height != 0:               
-                # transform the image msg to numpy array
-                cv_image = self.cv_bridge.imgmsg_to_cv2(image_msg)
 
-                # transform the pointcloud msg to numpy array and remove nans
-                point_cloud_XYZ = ros_numpy.point_cloud2.pointcloud2_to_xyz_array(lidar_msg)
+        def pointcloud_on_image(lidar_msg):
+            # transform the pointcloud msg to numpy array and remove nans
+            point_cloud_XYZ = ros_numpy.point_cloud2.pointcloud2_to_xyz_array(lidar_msg)
 
-                # translate and project PointCloud onto the Image
-                point_cloud_XYZ = self.imagehandler.translatePoints(point_cloud_XYZ)
-                img_pts, indices = self.imagehandler.projectPointsOnImage(point_cloud_XYZ)
+            # translate and project PointCloud onto the Image
+            # 3D Lidar points that are inside the image frame  
+            point_cloud_XYZ = self.imagehandler.translatePoints(point_cloud_XYZ)
+            self.pointcloud_on_image , self.pointcloud_in_image = self.imagehandler.projectPointsOnImage(point_cloud_XYZ)
+        
+        def object_detection(image_msg):
+            # transform the image msg to numpy array
+            cv_image = self.cv_bridge.imgmsg_to_cv2(image_msg, "bgr8")
+
+            # Detect objects in image
+            self.object_detection_result = self.objectdetector.detect(cv_image, return_image=self.visualize)
+
+            # If multiple instance for classes is not allowed,
+            # pick the one with highest confidance for every class.
+            if not self.multiple_instance:
+                detected_objects = []
+                row_to_delete    = []
+                for i in range(len(self.object_detection_result[0])):
+                    if self.object_detection_result[0]['class'][i] in detected_objects:
+                        row_to_delete.append(i)
+                    else:
+                        detected_objects.append(self.object_detection_result[0]['class'][i])
                 
-                # 3D Lidar points that are inside the image frame  
-                point_cloud_XYZ = point_cloud_XYZ[indices]
+                self.object_detection_result[0] = self.object_detection_result[0].drop(row_to_delete, axis=0)
 
-                # Detect objects in image
-                result = self.objectdetector.detect(cv_image, return_image=True)
+        def callback(image_msg, lidar_msg):
+            # If Image and Lidar messages are not empty 
+            if image_msg.height != 0 and lidar_msg.width > 0:
+                
+                # start_time = perf_counter()
+                pointcloud_on_image(lidar_msg)
+                # end_time = perf_counter()
+                # print(f'1) It took {end_time- start_time: 0.4f} second(s) to complete.')
 
-                # If no multiple instance for every class is allowed,
-                # pick the one with highest confidance for every class.
-                if not self.multiple_instance:
-                    detected_objects = []
-                    row_to_delete    = []
-                    for i in range(len(result[0])):
-                        if result[0]['class'][i] in detected_objects:
-                            row_to_delete.append(i)
-                        else:
-                            detected_objects.append(result[0]['class'][i])
-                    
-                    result[0] = result[0].drop(row_to_delete, axis=0)
+                # start_time = perf_counter()
+                object_detection(image_msg)                    
+                # end_time = perf_counter()
+                # print(f'2) It took {end_time- start_time: 0.4f} second(s) to complete.')
+
+                # start_time = perf_counter()
+                object_poses, on_object_list = self.objectlocalizer.localize(self.object_detection_result[0], \
+                                                                             self.pointcloud_on_image, \
+                                                                             self.pointcloud_in_image)
+                # end_time = perf_counter()
+                # print(f'3) It took {end_time- start_time: 0.4f} second(s) to complete.')
+
 
                 # Visualize all Lidar points that are inside the image frame
                 if self.visualize and self.visualize_all_points:
-                    for idx, pt in enumerate(img_pts):
-                        dist = np.linalg.norm(point_cloud_XYZ[idx])
+                    for idx, pt in enumerate(self.pointcloud_on_image):
+                        dist = np.linalg.norm(self.pointcloud_in_image[idx])
                         color = depth_color(dist)
-                        cv2.circle(result[1], tuple(pt), 1, color)
+                        cv2.circle(self.object_detection_result[1], tuple(pt), 1, color)
 
-
-                object_poses, indices_list = self.objectlocalizer.localize(result[0], img_pts,  point_cloud_XYZ)
 
                 # For every detected image object
-                for i in range(len(result[0])):
+                for i in range(len(self.object_detection_result[0])):
                     
                     xyz = object_poses[i]
-
                     if np.any(np.isnan(xyz)):
                         continue
 
                     # transformstamped_("blackfly_right_optical_link", "object", xyz, [0,0,0,1])
-                    self.TF_br.sendTransform(transformstamped_("blackfly_right_optical_link", "object", xyz, [0,0,0,1]))
+                    self.TF_br.sendTransform(transformstamped_(self.optical_frame, "object", \
+                                                               image_msg.header.stamp,xyz, [0,0,0,1]))
+                    transform = self.tf_buffer.lookup_transform_full(self.map_frame, image_msg.header.stamp, \
+                                                                     "object", image_msg.header.stamp, "map", \
+                                                                     rospy.Duration(1.0))
                     
-                    transform = self.tf_buffer.lookup_transform("map", "object",
-                                                                rospy.Time(0),
-                                                                rospy.Duration(10.0))
+                    obj_in_map = np.array([transform.transform.translation.x, \
+                                           transform.transform.translation.y, \
+                                           transform.transform.translation.z ])
                     
-                    obj_in_map = np.array([transform.transform.translation.x, transform.transform.translation.y, transform.transform.translation.z ])
-                    markers = MarkerArray()
-                    markers.markers.append(marker_("object", self.obj_id, obj_in_map, [1.0,0,0]))
-                    if self.mean_tag_pos is not None:
-                        markers.markers.append(marker_("tag", 1, self.mean_tag_pos, [0,1.0,0]))
-                    self.marker_pub.publish(markers)                
+                    if self.create_obj_marker:
+                        markers = MarkerArray()
+                        markers.markers.append(marker_("object", self.obj_id, obj_in_map, [1.0,0,0]))
+                        if self.mean_tag_pos is not None:
+                            markers.markers.append(marker_("tag", 1, self.mean_tag_pos, [0,1.0,0]))
+                        self.marker_pub.publish(markers)                
 
                     self.obj_id += 1
-                    in_BB_XYZ = point_cloud_XYZ[indices_list[i]]
                     # Visualize pointcloud on the image with objects
                     if self.visualize and not self.visualize_all_points:
-                        for idx, pt in enumerate(img_pts[indices_list[i]]):
-                            dist = np.linalg.norm(in_BB_XYZ[idx])
+                        for idx, pt in enumerate( self.pointcloud_on_image[on_object_list[i],:]): 
+                            dist = np.linalg.norm(self.pointcloud_in_image[on_object_list[i]])
                             color = depth_color(dist)
-                            cv2.circle(result[1], tuple(pt), 1, color)
-                img_msg = self.cv_bridge.cv2_to_imgmsg(result[1], 'bgr8')
-                img_msg.header.frame_id = "blackfly_right_optical_link"
-                self.out_image_pub.publish(img_msg)
+                            cv2.circle(self.object_detection_result[1], tuple(pt), 1, color)
+
+                if self.visualize:
+                    img_msg = self.cv_bridge.cv2_to_imgmsg(self.object_detection_result[1], 'bgr8')
+                    img_msg.header.frame_id = self.optical_frame
+                    self.out_image_pub.publish(img_msg)
 
         self.camera_info_sub = rospy.Subscriber(self.camera_info_topic , CameraInfo, self.image_info_callback)
-        self.tag_sub         = rospy.Subscriber(self.tag_topic , AprilTagDetectionArray, self.tag_callback) 
         self.synchronizer.registerCallback(callback)
+
+        if self.validate:
+            self.tag_sub         = rospy.Subscriber(self.tag_topic , AprilTagDetectionArray, self.tag_callback) 
+
         rospy.spin()
 
 if __name__ == '__main__':

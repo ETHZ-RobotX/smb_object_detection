@@ -4,7 +4,7 @@
     <arg name="visualize" value="1"/>
   </include>
 
-  <include file="$(find map)/launch/continuous_tag_detection.launch"/>
+  <include file="$(find map)/launch/continuous_tag_detection_client.launch"/>
 
   <node name="mapper" pkg="map" type="node.py" output="screen">
     <param name="pc_map_topic" value='/icp_node/icp_map'/>

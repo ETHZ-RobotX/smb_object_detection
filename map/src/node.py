@@ -2,7 +2,7 @@
 import rospy
 import ros_numpy
 import numpy as np
-from sensor_msgs.msg import PointCloud2
+from sensor_msgs.msg import PointCloud2, Image
 import tf2_ros
 from tf2_sensor_msgs.tf2_sensor_msgs import do_transform_cloud
 from sensor_msgs.msg import PointField
@@ -13,8 +13,10 @@ import rosbag
 from datetime import datetime
 import os
 
+
 from map.map import Map
 from apriltag_ros.msg import *
+import apriltag_ros as at 
 
 
 import warnings
@@ -120,8 +122,6 @@ class Node:
         self.tf_buffer = tf2_ros.Buffer(rospy.Duration(1.0)) #tf buffer length
         self.tf_listener = tf2_ros.TransformListener(self.tf_buffer)
 
-        print(self.log_period)
-
         now  = datetime.now()
         now  = now.strftime("%m_%d_%Y_%H_%M")
         file_dir = os.path.join(self.output_dir, "mapping_stats_" + now)
@@ -165,14 +165,12 @@ class Node:
         for tag in data.detections:
             # print("Tag ",tag.id[0]," has been seen." )
 
-
             transform = self.tf_buffer.lookup_transform('map',
                                         'tag_' + str(tag.id[0]), #source frame
                                         rospy.Time(0),
                                         rospy.Duration(5.0)) #get the tf at first available time) #wait for 5 second
 
-            xyz = np.array([transform.transform.translation.x, transform.transform.translation.y, transform.transform.translation.z ])
-            # xyz = np.array([tag.pose.pose.pose.position.x, tag.pose.pose.pose.position.y, tag.pose.pose.pose.position.z ])    
+            xyz = np.array([transform.transform.translation.x, transform.transform.translation.y, transform.transform.translation.z ])  
             self.mapper.seeTag(tag.id[0], xyz)
 
             color = self.mapper.april_color[str(tag.id[0])]
@@ -231,12 +229,11 @@ class Node:
             markers.markers.append(marker_(str(id),i, m_pos, color, type="mean"))
             self.marker_pub.publish(markers)
             self.bag.write('/tags', markers)
-
-
     
     def run(self):
         self.pc_map_sub                     = rospy.Subscriber(self.pc_map_topic, PointCloud2, self.pc_map_callback)
         self.tag_sub                        = rospy.Subscriber(self.tag_topic , AprilTagDetectionArray, self.tag_callback) 
+        
 
         rospy.spin()
 

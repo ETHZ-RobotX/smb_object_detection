@@ -19,7 +19,6 @@
 #   ]
 standalone_tags:
   [
-    {id: 3, size: 0.16 },
     {id: 13, size: 0.16 }
 
   ]

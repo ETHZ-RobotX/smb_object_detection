@@ -64,28 +64,16 @@ class ImageHandler:
         return np.transpose(xy[:2,:]), indices
 
 
-    def projectPointsOnImage(self, points, use_cv2=False):
+    def projectPointsOnImage(self, points):
         """ Projects 3D points onto the image
         Args:
             points: nx3 matrix XYZ
-            use_cv2: default false, use cv2 to project points
         Returns:
             points_on_image: pixel coordinates of projected points
-            indices: indices of projected points that are inside the frame
+            points_in_image: 3D coordinates of projected points
         """
-        
-        if use_cv2:
-            indices = np.arange(0,len(points))
-            front_hemisphere = points[:, 1] < 0 
-            front_hemisphere_indices = np.argwhere(front_hemisphere).flatten()
-            indices = indices[front_hemisphere_indices]
-            points = points[front_hemisphere_indices,:]
-            points_on_image = cv2.projectPoints(points, self.R, self.t, self.K, self.dist)[0]
-            
-        else:
-            # translated_points = self.__translatePoints(points)
-            points_on_image, indices = self.projectPoints(points)
-          
+
+        points_on_image, indices = self.projectPoints(points)
         points_on_image = np.uint32(np.squeeze(points_on_image))
         
         inside_frame_x = np.logical_and((points_on_image[:,0] >= 0), (points_on_image[:,0] < self.w))
@@ -94,8 +82,8 @@ class ImageHandler:
         
         indices = indices[inside_frame_indices]
         points_on_image = points_on_image[inside_frame_indices,:]    
-
-        return points_on_image, indices
+    
+        return points_on_image, points[indices]
 
 
 

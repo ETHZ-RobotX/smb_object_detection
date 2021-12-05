@@ -15,10 +15,10 @@
     <param name="image_save_path" type="str" value="$(arg image_save_path)" />
 
     <!-- Camera intrinsic parameters -->
-    <param name="fx" type="double" value="652.7934615847107" />
-    <param name="fy" type="double" value="653.9480389077635" />
-    <param name="cx" type="double" value="307.1288710375904" />
-    <param name="cy" type="double" value="258.7823279214385" />
+    <param name="fx" type="double" value="627.5366624517205" />
+    <param name="fy" type="double" value="627.5366624517205" />
+    <param name="cx" type="double" value="1186.0" />
+    <param name="cy" type="double" value="687.5" />
 
   </node>
 
