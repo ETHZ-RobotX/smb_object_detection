@@ -119,7 +119,7 @@ class Node:
         self.tag_topic                      = rospy.get_param('~tag_topic', '/tag_detections')
         self.output_dir                     = rospy.get_param('~output_dir', '.')
         self.log_period                     = rospy.get_param('~log_period', 20)
-        self.tf_buffer = tf2_ros.Buffer(rospy.Duration(1.0)) #tf buffer length
+        self.tf_buffer = tf2_ros.Buffer(rospy.Duration(5.0)) #tf buffer length
         self.tf_listener = tf2_ros.TransformListener(self.tf_buffer)
 
         now  = datetime.now()
@@ -165,23 +165,35 @@ class Node:
         for tag in data.detections:
             # print("Tag ",tag.id[0]," has been seen." )
 
-            transform = self.tf_buffer.lookup_transform('map',
-                                        'tag_' + str(tag.id[0]), #source frame
-                                        rospy.Time(0),
-                                        rospy.Duration(5.0)) #get the tf at first available time) #wait for 5 second
+            pos_array = np.zeros(3)
+            pos_array[0] = tag.pose.pose.pose.position.x
+            pos_array[1] = tag.pose.pose.pose.position.y
+            pos_array[2] = tag.pose.pose.pose.position.z
 
-            xyz = np.array([transform.transform.translation.x, transform.transform.translation.y, transform.transform.translation.z ])  
-            self.mapper.seeTag(tag.id[0], xyz)
+            if np.linalg.norm(pos_array) <1000:
 
-            color = self.mapper.april_color[str(tag.id[0])]
-            m_pos = self.mapper.april_m_pos[str(tag.id[0])]
-            pos   = self.mapper.april_pos[str(tag.id[0])]
+                transform = self.tf_buffer.lookup_transform('map',
+                                            'tag_' + str(tag.id[0]), #source frame
+                                            rospy.Time(0),
+                                            rospy.Duration(5.0)) #get the tf at first available time) #wait for 5 second
 
-            for id,p in enumerate(pos):
-                markers.markers.append(marker_(str(tag.id[0]), id, p, color))
+                # transform = self.tf_buffer.lookup_transform_full('map', data.header.stamp, \
+                #                                                  'tag_' + str(tag.id[0]), data.header.stamp, 'map', \
+                #                                                   rospy.Duration(2.0))
 
-            markers.markers.append(marker_(str(tag.id[0]),id, m_pos, color, type="mean"))
-            self.marker_pub.publish(markers)
+
+                xyz = np.array([transform.transform.translation.x, transform.transform.translation.y, transform.transform.translation.z ])  
+                self.mapper.seeTag(tag.id[0], xyz)
+
+                color = self.mapper.april_color[str(tag.id[0])]
+                m_pos = self.mapper.april_m_pos[str(tag.id[0])]
+                pos   = self.mapper.april_pos[str(tag.id[0])]
+
+                for id,p in enumerate(pos):
+                    markers.markers.append(marker_(str(tag.id[0]), id, p, color))
+
+                markers.markers.append(marker_(str(tag.id[0]),id, m_pos, color, type="mean"))
+                self.marker_pub.publish(markers)
 
         if self.log_period > 0 and int(rospy.get_time()) % self.log_period == 0 and int(rospy.get_time()) != 0:
             self.save_stats()

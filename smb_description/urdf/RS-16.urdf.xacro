@@ -20,7 +20,7 @@
       <visual>
         <origin rpy="-1.5707 0 0" xyz="0 0 0"/>
         <geometry>
-          <mesh filename="package://robosense_description/meshes/robosense_16.dae" />
+          <mesh filename="package://smb_description/urdf/meshes/robosense_16.dae" />
         </geometry>
       </visual>
       <collision>

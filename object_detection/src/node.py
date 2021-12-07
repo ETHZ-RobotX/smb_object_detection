@@ -112,6 +112,12 @@ def transformstamped_(frame_id, child_id, time, pose, rot):
 
     return t
 
+def pointcloud_filter_ground(xyz):
+    min_z = min(xyz[:,2])
+
+    non_ground_indices = np.argwhere(xyz[:,2] > min_z*0.8).flatten()
+    return(xyz[non_ground_indices])
+
 class Node:
     def __init__(self):
 
@@ -136,22 +142,6 @@ class Node:
 
         self.validate                       = rospy.get_param('~validate', True)
         
-        # Output related
-        self.visualize                      = rospy.get_param('visualize', True)
-        self.visualize_all_points           = rospy.get_param('~visualize_all_points', False)
-        
-        if self.visualize:
-            self.out_image_pub_topic            = rospy.get_param('~out_image_pub_topic', "/versavis/cam0/objects")
-            self.out_image_pub                  = rospy.Publisher(self.out_image_pub_topic , Image, queue_size=5)
-        
-        self.TF_br                          = tf2_ros.StaticTransformBroadcaster()
-
-        self.create_obj_marker              = rospy.get_param('~create_obj_marker', 'true')
-        self.obj_marker_topic               = rospy.get_param('~obj_marker_topic', '/object')
-
-        if self.create_obj_marker:
-            self.marker_pub                     = rospy.Publisher(self.obj_marker_topic , MarkerArray, queue_size=10)
-
         # Validate the location with AprilTag
         if self.validate :
             self.tf_buffer                      = tf2_ros.Buffer(rospy.Duration(2.0)) #tf buffer length
@@ -182,11 +172,34 @@ class Node:
         # Object Localizaer related 
         self.objectlocalizer_cfg = {}
         self.objectlocalizer_cfg['model_method']   = rospy.get_param('~model_method', 'hdbscan') # same class multiple instance
+        
+        # Output related
+        self.visualize                      = rospy.get_param('~visualize', True)
+        self.visualize_all_points           = rospy.get_param('~visualize_all_points', False)
+        
+        if self.visualize:
+            self.out_image_pub_topic            = rospy.get_param('~out_image_pub_topic', "/versavis/cam0/objects")
+            self.out_image_pub                  = rospy.Publisher(self.out_image_pub_topic , Image, queue_size=5)
+        
+        self.TF_br                          = tf2_ros.StaticTransformBroadcaster()
+
+        self.create_obj_marker              = rospy.get_param('~create_obj_marker', 'true')
+        self.obj_marker_topic               = rospy.get_param('~obj_marker_topic', '/object')
+
+        if self.create_obj_marker:
+            self.marker_pub                     = rospy.Publisher(self.obj_marker_topic , MarkerArray, queue_size=10)
+            self.marker_color                   = {}
+
+            if self.objectdetector_cfg['classes'] is not None:
+                for c in self.objectdetector_cfg['classes']:
+                    self.marker_color [c] = np.random.rand(3)
+
 
         # By-products
         self.object_detection_result        = None
         self.pointcloud_on_image            = None      # 2D pointcloud on image with pixel coordinages 
         self.pointcloud_in_image            = None      # 3D pointcloud in image frame
+        self.cv_image                       = None
 
         # Camera Params
         self.imagehandler                   = ImageHandler()
@@ -220,10 +233,6 @@ class Node:
         self.objectdetector      = ObjectDetector(self.objectdetector_cfg)
         print("Object Detector is set")
     
-    def clear_by_products(self):
-        self.object_detection_result        = None
-        self.pointcloud_on_image            = None
-        self.pointcloud_in_image            = None 
 
     def image_info_callback(self, camera_info):
         h = camera_info.height
@@ -246,12 +255,13 @@ class Node:
             # self.mean_tag_pos = np.mean(self.tag_pos, axis=0)
             self.mean_tag_pos = xyz
 
-
     def run(self):
 
         def pointcloud_on_image(lidar_msg):
             # transform the pointcloud msg to numpy array and remove nans
             point_cloud_XYZ = ros_numpy.point_cloud2.pointcloud2_to_xyz_array(lidar_msg)
+
+            point_cloud_XYZ = pointcloud_filter_ground(point_cloud_XYZ)
 
             # translate and project PointCloud onto the Image
             # 3D Lidar points that are inside the image frame  
@@ -260,11 +270,10 @@ class Node:
         
         def object_detection(image_msg):
             # transform the image msg to numpy array
-            cv_image = self.cv_bridge.imgmsg_to_cv2(image_msg, "bgr8")
+            self.cv_image = self.cv_bridge.imgmsg_to_cv2(image_msg, "bgr8")
 
             # Detect objects in image
-            self.object_detection_result = self.objectdetector.detect(cv_image, return_image=self.visualize)
-
+            self.object_detection_result = self.objectdetector.detect(self.cv_image, return_image=self.visualize)
             # If multiple instance for classes is not allowed,
             # pick the one with highest confidance for every class.
             if not self.multiple_instance:
@@ -277,6 +286,7 @@ class Node:
                         detected_objects.append(self.object_detection_result[0]['class'][i])
                 
                 self.object_detection_result[0] = self.object_detection_result[0].drop(row_to_delete, axis=0)
+                self.object_detection_result[0].reset_index(inplace=True)
 
         def callback(image_msg, lidar_msg):
             # If Image and Lidar messages are not empty 
@@ -295,7 +305,8 @@ class Node:
                 # start_time = perf_counter()
                 object_poses, on_object_list = self.objectlocalizer.localize(self.object_detection_result[0], \
                                                                              self.pointcloud_on_image, \
-                                                                             self.pointcloud_in_image)
+                                                                             self.pointcloud_in_image, \
+                                                                             self.cv_image  )
                 # end_time = perf_counter()
                 # print(f'3) It took {end_time- start_time: 0.4f} second(s) to complete.')
 
@@ -314,13 +325,16 @@ class Node:
                     xyz = object_poses[i]
                     if np.any(np.isnan(xyz)):
                         continue
-
+                    
                     # transformstamped_("blackfly_right_optical_link", "object", xyz, [0,0,0,1])
                     self.TF_br.sendTransform(transformstamped_(self.optical_frame, "object", \
-                                                               image_msg.header.stamp,xyz, [0,0,0,1]))
-                    transform = self.tf_buffer.lookup_transform_full(self.map_frame, image_msg.header.stamp, \
-                                                                     "object", image_msg.header.stamp, "map", \
+                                                                image_msg.header.stamp, xyz, [0,0,0,1]))
+                    try:        
+                        transform = self.tf_buffer.lookup_transform_full(self.map_frame, image_msg.header.stamp, \
+                                                                     "object", image_msg.header.stamp, self.map_frame, \
                                                                      rospy.Duration(1.0))
+                    except:
+                        continue
                     
                     obj_in_map = np.array([transform.transform.translation.x, \
                                            transform.transform.translation.y, \
@@ -339,12 +353,18 @@ class Node:
                         for idx, pt in enumerate( self.pointcloud_on_image[on_object_list[i],:]): 
                             dist = np.linalg.norm(self.pointcloud_in_image[on_object_list[i]])
                             color = depth_color(dist)
-                            cv2.circle(self.object_detection_result[1], tuple(pt), 1, color)
+                            try:
+                                cv2.circle(self.object_detection_result[1], pt, 1, color)
+                            except:
+                                print(pt)
 
                 if self.visualize:
                     img_msg = self.cv_bridge.cv2_to_imgmsg(self.object_detection_result[1], 'bgr8')
                     img_msg.header.frame_id = self.optical_frame
                     self.out_image_pub.publish(img_msg)
+                
+                # end_time = perf_counter()
+                # print(f'1) It took {end_time- start_time: 0.4f} second(s) to complete.')
 
         self.camera_info_sub = rospy.Subscriber(self.camera_info_topic , CameraInfo, self.image_info_callback)
         self.synchronizer.registerCallback(callback)

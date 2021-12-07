@@ -1,0 +1,7 @@
+versavis:
+  distortion_coeffs: [0.0015468942458299077, 0.016728510031055667, -0.012402919578346982, 0.0028225260226666755]
+  distortion_model: equidistant
+  camera_model: pinhole
+  intrinsics: [627.7059273918105, 627.3673975116307, 752.5902524736157, 555.9658406687556]
+  resolution: [1440, 1080]
+  rostopic: /versavis/cam0/image_raw

@@ -76,8 +76,8 @@ class ImageHandler:
         points_on_image, indices = self.projectPoints(points)
         points_on_image = np.uint32(np.squeeze(points_on_image))
         
-        inside_frame_x = np.logical_and((points_on_image[:,0] >= 0), (points_on_image[:,0] < self.w))
-        inside_frame_y = np.logical_and((points_on_image[:,1] >= 0), (points_on_image[:,1] < self.h))
+        inside_frame_x = np.logical_and((points_on_image[:,0] >= 0), (points_on_image[:,0] < self.w-1))
+        inside_frame_y = np.logical_and((points_on_image[:,1] >= 0), (points_on_image[:,1] < self.h-1))
         inside_frame_indices = np.argwhere(np.logical_and(inside_frame_x,inside_frame_y)).flatten()
         
         indices = indices[inside_frame_indices]
