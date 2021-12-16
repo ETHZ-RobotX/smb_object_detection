@@ -22,11 +22,12 @@ import apriltag_ros as at
 import warnings
 warnings.filterwarnings("ignore")
 
-def marker_(ns, marker_id, pos, color, type="all"):
+def marker_(ns, marker_id, pos, stamp, color, type="all"):
 
     marker = Marker()
     marker.ns = str(ns)
     marker.header.frame_id = "map"
+    marker.header.stamp = stamp
     marker.type = 2
     marker.action = 0
     marker.pose = Pose()
@@ -172,15 +173,17 @@ class Node:
 
             if np.linalg.norm(pos_array) <1000:
 
-                transform = self.tf_buffer.lookup_transform('map',
-                                            'tag_' + str(tag.id[0]), #source frame
-                                            rospy.Time(0),
-                                            rospy.Duration(5.0)) #get the tf at first available time) #wait for 5 second
+                # transform = self.tf_buffer.lookup_transform('map',
+                #                             'tag_' + str(tag.id[0]), #source frame
+                #                             rospy.Time(0),
+                #                             rospy.Duration(5.0)) #get the tf at first available time) #wait for 5 second
 
-                # transform = self.tf_buffer.lookup_transform_full('map', data.header.stamp, \
-                #                                                  'tag_' + str(tag.id[0]), data.header.stamp, 'map', \
-                #                                                   rospy.Duration(2.0))
-
+                try:
+                    transform = self.tf_buffer.lookup_transform_full('map', data.header.stamp, \
+                                                                    'tag_' + str(tag.id[0]), data.header.stamp, 'map', \
+                                                                    rospy.Duration(2.0))
+                except:
+                    continue
 
                 xyz = np.array([transform.transform.translation.x, transform.transform.translation.y, transform.transform.translation.z ])  
                 self.mapper.seeTag(tag.id[0], xyz)
@@ -190,9 +193,9 @@ class Node:
                 pos   = self.mapper.april_pos[str(tag.id[0])]
 
                 for id,p in enumerate(pos):
-                    markers.markers.append(marker_(str(tag.id[0]), id, p, color))
+                    markers.markers.append(marker_(str(tag.id[0]), id, p, data.header.stamp, color))
 
-                markers.markers.append(marker_(str(tag.id[0]),id, m_pos, color, type="mean"))
+                markers.markers.append(marker_(str(tag.id[0]),id, m_pos, data.header.stamp, color, type="mean"))
                 self.marker_pub.publish(markers)
 
         if self.log_period > 0 and int(rospy.get_time()) % self.log_period == 0 and int(rospy.get_time()) != 0:
@@ -236,9 +239,9 @@ class Node:
             pos   = self.mapper.april_pos[str(id)]
 
             for i,p in enumerate(pos):
-                markers.markers.append(marker_(str(id),i, p, color))
+                markers.markers.append(marker_(str(id),i, p, rospy.Time.now(), color))
 
-            markers.markers.append(marker_(str(id),i, m_pos, color, type="mean"))
+            markers.markers.append(marker_(str(id),i, m_pos, rospy.Time.now(), color, type="mean"))
             self.marker_pub.publish(markers)
             self.bag.write('/tags', markers)
     

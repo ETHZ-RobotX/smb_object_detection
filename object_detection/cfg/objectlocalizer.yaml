@@ -1,0 +1,41 @@
+person:
+  eps : 0.15
+  contract_percentage_bottom : 10
+  contract_percentage_top : 10
+  contract_percentage_sides : 10 
+  max_depth : 0.3 
+
+bicycle:
+  eps : 0.2
+  contract_percentage_bottom : 10
+  contract_percentage_top : 10
+  contract_percentage_sides : 15 
+  max_depth : 0.15  
+
+car:
+  eps : 0.2
+  contract_percentage_bottom : 10
+  contract_percentage_top : 10
+  contract_percentage_sides : 15 
+  max_depth : 0.15  
+
+clock:
+  eps : 0.2
+  contract_percentage_bottom : 0
+  contract_percentage_top : 0
+  contract_percentage_sides : 0 
+  max_depth : 0.3
+
+bottle:
+  eps : 0.2
+  contract_percentage_bottom : 0
+  contract_percentage_top : 0
+  contract_percentage_sides : 0 
+  max_depth : 0.3
+
+umbrella:
+  eps : 0.2
+  contract_percentage_bottom : 5
+  contract_percentage_top : 5
+  contract_percentage_sides : 5 
+  max_depth : 0.4

@@ -1,12 +1,15 @@
 <launch>
 
-  <arg name="rosbag_path" default="$(find map)/bike_0_13_smb.bag"/>
+  <arg name="rosbag_name" default="bike_1_7_smb"/>
+  <arg name="rosbag_path" default="/media/oilter/D4561E4E561E31AA/SemesterProject/2021-12-06/$(arg rosbag_name).bag"/>
 
   <include file="$(find smb_description)/launch/debug.launch">
     <arg name="visualize" value="1"/>
   </include>
 
-  <arg name="validate" default="true"/>
+  <arg name="record_data" default="True"/>
+
+  <arg name="validate" default="True"/>
   <arg name="input_camera_name" default="/versavis/cam0" />
   <arg name="lidar_topic" default='/rslidar_points'/>
   <arg name="optical_frame_name" default='blackfly_right_optical_link'/>
@@ -53,7 +56,11 @@
     <param name="optical_frame" value='$(arg optical_frame_name)'/>
     <param name="map_frame" value='map'/>
 
+    <!-- Record data and error -->
     <param name="validate" value="$(arg validate)"/>
+    <param name="record_data" value="$(arg record_data)"/>
+    <param name="on_object_tag" value="1"/>
+    <param name="statistic_txt" value="$(arg rosbag_name)"/>
 
     <!--Output related-->
     <param name="visualize" value='true'/>
@@ -70,15 +77,16 @@
     <param name="architecture" value='yolo'/>
     <param name="model" value='yolov5n'/>
     <param name="device" value='cpu'/>
-    <param name="confident" value='0.4'/>
+    <param name="confident" value='0.2'/>
     <param name="iou" value='0.1'/>
     <param name="classes" value='[1]'/>
 
     <!--Object localization related-->
     <param name="model_method" value='hdbscan'/>
+    <param name="localizer_config" value='$(find object_detection)/cfg/objectlocalizer.yaml'/>
 
   </node>
 
-  <node pkg="rosbag" type="play" name="player" output="screen" args="-d 5 -r 0.5 $(arg rosbag_path)" required = "false"/>
+  <node pkg="rosbag" type="play" name="player" output="screen" args="-d 5 -s 0 -r 0.4 $(arg rosbag_path)" required = "false"/>
 
 </launch>
