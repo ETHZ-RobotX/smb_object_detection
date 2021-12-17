@@ -1,0 +1,7 @@
+architecture  : yolo
+model         : yolov5n
+checkpoint    : null
+device        : cpu
+confident     : 0.5
+iou           : 0.45
+classes       : null

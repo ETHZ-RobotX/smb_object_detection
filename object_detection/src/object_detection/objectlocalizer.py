@@ -10,12 +10,11 @@ from object_detection.object import Object
 
 class ObjectLocalizer:
     def __init__(self, config):
-        self.model_method       = config["model_method"]
-        self.config_file        = config["localizer_config"]
-        self.i = 0
 
-        with open(self.config_file) as file:
-            self.obj_conf = yaml.load(file, Loader=yaml.FullLoader)
+        with open(config) as file:
+            self.config             = yaml.load(file, Loader=yaml.FullLoader)
+            self.obj_conf           = self.config['objects']
+            self.model_method       = self.config["model_method"].lower()
 
     def save_scene(self, objects_BB, points2D, points3D, image=None ):
         """
@@ -215,7 +214,9 @@ class ObjectLocalizer:
 
         on_object = np.arange(0,in_BB_3D.shape[0])
 
-        if self.model_method == "mean":
+        if self.model_method == "hdbscan":
+            pos, on_object = self.method_hdbscan_closeness(in_BB_3D, center_ind, obj_class)
+        elif self.model_method == "mean":
             pos = np.mean(in_BB_3D, axis=0)
         elif self.model_method == "median":
             pos = np.median(in_BB_3D, axis=0)
@@ -223,8 +224,7 @@ class ObjectLocalizer:
             pos = in_BB_3D[center_ind,:]
         elif self.model_method == "histogram":
             pos, on_object = self.method_histogram(in_BB_3D)
-        elif self.model_method == "hdbscan":
-            pos, on_object = self.method_hdbscan_closeness(in_BB_3D, center_ind, obj_class)
+
 
         return pos, in_BB_indices[on_object]
 

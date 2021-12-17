@@ -1,10 +1,24 @@
+import yaml
+
 from PIL.Image import FASTOCTREE
 import numpy as np
-import cv2
 
-class ImageHandler:
-    def __init__(self):
-        self.init   = False
+class PointProjector:
+    def __init__(self, config):
+
+        with open(config) as file:
+            self.config         = yaml.load(file, Loader=yaml.FullLoader)
+            R_camera_lidar      = self.config["R_camera_lidar"]
+            R_correction        = self.config["R_correction"]
+            t_camera_lidar      = self.config["t_camera_lidar"]
+
+        R_camera_lidar = np.float64(R_camera_lidar)
+        R_correction = np.float64(R_correction)
+
+        R_camera_lidar = np.matmul(R_camera_lidar,R_correction)       
+        t_camera_lidar = np.float64(t_camera_lidar)
+
+        self.set_transformationparams(R_camera_lidar,t_camera_lidar)
         self.K      = None  
         self.w      = None
         self.h      = None
