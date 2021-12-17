@@ -89,7 +89,7 @@ class Node:
 
                 # translate and project PointCloud onto the Image  
                 point_cloud_XYZ = self.pointprojector.translatePoints(point_cloud_XYZ)
-                pointcloud_on_image , pointcloud_in_image = self.pointprojector.projectPointsOnImage(point_cloud_XYZ)
+                pointcloud_on_image , pointcloud_in_FoV = self.pointprojector.projectPointsOnImage(point_cloud_XYZ)
 
                 # transform the image msg to numpy array
                 cv_image = self.imagereader.imgmsg_to_cv2(image_msg, "bgr8")
@@ -100,15 +100,17 @@ class Node:
                 # pick the one with highest confidance for every class.
                 object_poses, on_object_list = self.objectlocalizer.localize(object_detection_result, \
                                                                              pointcloud_on_image, \
-                                                                             pointcloud_in_image, \
+                                                                             pointcloud_in_FoV, \
                                                                              cv_image  )
 
                 # Create object detection message
                 object_detection_array = ObjectDetectionArray()
-                object_detection_array.header.stamp     = image_msg.header.stamp
-                object_detection_array.header.frame_id  = self.optical_frame_id
-                object_detection_array.header.seq       = self.seq
-                object_detection_array.detections_image = self.imagereader.cv2_to_imgmsg(object_detection_image, 'bgr8')
+                object_detection_array.header.stamp         = image_msg.header.stamp
+                object_detection_array.header.frame_id      = self.optical_frame_id
+                object_detection_array.header.seq           = self.seq
+                object_detection_array.detections_image     = self.imagereader.cv2_to_imgmsg(object_detection_image, 'bgr8')
+                object_detection_array.pointcloud_in_BB_2D  = ros_numpy.point_cloud2.array_to_pointcloud2(pointcloud_on_image) # TODO: Implement 2D TEST
+                object_detection_array.pointcloud_in_BB_3D  = ros_numpy.point_cloud2.array_to_pointcloud2(pointcloud_in_FoV) # TODO: Implement 3D TEST
                 
                 self.seq = self.seq + 1 if self.seq < UINT32-1 else 0
 
@@ -123,9 +125,6 @@ class Node:
                     object_detection.bounding_box_min_y = object_detection_result['ymin'][i]
                     object_detection.bounding_box_max_x = object_detection_result['xmax'][i]
                     object_detection.bounding_box_max_y = object_detection_result['ymax'][i]
-
-                    object_detection.pointcloud_in_BB_2D = 42 # TODO: Implement 2D
-                    object_detection.pointcloud_in_BB_3D = 42 # TODO: Implement 3D 
 
                     object_detection.on_object_point_indices = np.array(on_object_list[i], dtype=np.int32)
                     

@@ -3,10 +3,7 @@ from scipy.signal import find_peaks
 from sklearn.cluster import DBSCAN, OPTICS
 import yaml
 
-from skimage.metrics import structural_similarity as compare_ssim
-
-
-from object_detection.object import Object
+# TODO: Implement ground removal
 
 class ObjectLocalizer:
     def __init__(self, config):
