@@ -97,7 +97,7 @@ class Node:
                 # Detect objects in image
                 object_detection_result, object_detection_image = self.objectdetector.detect(cv_image, multiple_instance = self.multiple_instance)
                 
-                # pick the one with highest confidance for every class.
+                # Localize every detected object
                 object_poses, on_object_list = self.objectlocalizer.localize(object_detection_result, \
                                                                              pointcloud_on_image, \
                                                                              pointcloud_in_FoV, \
