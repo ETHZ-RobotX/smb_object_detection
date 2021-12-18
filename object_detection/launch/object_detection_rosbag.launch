@@ -1,7 +1,7 @@
 <launch>
 
-  <arg name="rosbag_name" default="bike_1_7_smb"/>
-  <arg name="rosbag_path" default="/media/oilter/D4561E4E561E31AA/SemesterProject/2021-12-06/$(arg rosbag_name).bag"/>
+  <arg name="rosbag_name" default="bike_0_5_person_3_clock_1_smb"/>
+  <arg name="rosbag_path" default="/media/oilter/D4561E4E561E31AA/SemesterProject/objectsFinal/$(arg rosbag_name).bag"/>
 
   <include file="$(find smb_description)/launch/debug.launch">
     <arg name="visualize" value="1"/>
@@ -79,7 +79,7 @@
     <param name="device" value='cpu'/>
     <param name="confident" value='0.2'/>
     <param name="iou" value='0.1'/>
-    <param name="classes" value='[1]'/>
+    <param name="classes" value='[0, 1]'/>
 
     <!--Object localization related-->
     <param name="model_method" value='hdbscan'/>

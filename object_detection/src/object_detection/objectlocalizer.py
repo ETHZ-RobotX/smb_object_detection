@@ -86,7 +86,7 @@ class ObjectLocalizer:
             weights = weights + 1
 
         avg =  np.ma.average(in_BB_3D[indices], axis=0, weights=weights)
-        # avg[:2] = in_BB_3D[center_id, :2]
+        
         center_point = in_BB_3D[center_id]
         center_point[:2] = center_point[:2] * (avg[2] / center_point[2])
         avg[:2] = center_point[:2]
