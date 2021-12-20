@@ -43,6 +43,23 @@ def hsv2rgb(h, s, v):
     r, g, b = int(r * 255), int(g * 255), int(b * 255)
     return r, g, b
 
+def euler_to_rotMat(z, y, x):
+    Rz_yaw = np.array([
+        [np.cos(z), -np.sin(z), 0],
+        [np.sin(z),  np.cos(z), 0],
+        [          0,            0, 1]])
+    Ry_pitch = np.array([
+        [ np.cos(y), 0, np.sin(y)],
+        [             0, 1,             0],
+        [-np.sin(y), 0, np.cos(y)]])
+    Rx_roll = np.array([
+        [1,            0,             0],
+        [0, np.cos(x), -np.sin(x)],
+        [0, np.sin(x),  np.cos(x)]])
+    # R = RzRyRx
+    rotMat = np.dot(Rz_yaw, np.dot(Ry_pitch, Rx_roll))
+    return rotMat
+
 def depth_color(val, min_d=0.2, max_d=20):
     """
     print Color(HSV's H value) corresponding to distance(m)
@@ -236,6 +253,7 @@ class Node:
         R = [ [ 0.9998379,  0.0180019,  0.0000000],
               [-0.0180019,  0.9998379,  0.0000000],
               [ 0.0000000,  0.0000000,  1.0000000]]
+        R = euler_to_rotMat(np.deg2rad(-1), 0, np.deg2rad(1))
 
         R_camera_lidar = np.matmul(R_camera_lidar,R)       
         t_camera_lidar = np.float64([-0.045, -0.293, -0.241])

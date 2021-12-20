@@ -1,6 +1,6 @@
 <launch>
 
-  <arg name="rosbag_name" default="bike_0_5_person_3_clock_1_smb"/>
+  <arg name="rosbag_name" default="bike_0_5_smb"/>
   <arg name="rosbag_path" default="/media/oilter/D4561E4E561E31AA/SemesterProject/objectsFinal/$(arg rosbag_name).bag"/>
 
   <include file="$(find smb_description)/launch/debug.launch">
@@ -79,7 +79,7 @@
     <param name="device" value='cpu'/>
     <param name="confident" value='0.2'/>
     <param name="iou" value='0.1'/>
-    <param name="classes" value='[0, 1]'/>
+    <param name="classes" value='[1]'/>
 
     <!--Object localization related-->
     <param name="model_method" value='hdbscan'/>
@@ -87,6 +87,6 @@
 
   </node>
 
-  <node pkg="rosbag" type="play" name="player" output="screen" args="-d 5 -s 0 -r 0.4 $(arg rosbag_path)" required = "false"/>
+  <node pkg="rosbag" type="play" name="player" output="screen" args="-d 5 -s 6 -r 0.4 $(arg rosbag_path)" required = "false"/>
 
 </launch>

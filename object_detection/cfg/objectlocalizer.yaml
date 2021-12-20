@@ -6,11 +6,11 @@ person:
   max_depth : 0.3 
 
 bicycle:
-  eps : 0.2
+  eps : 1
   contract_percentage_bottom : 10
   contract_percentage_top : 10
   contract_percentage_sides : 15 
-  max_depth : 0.15  
+  max_depth : 0.5  
 
 car:
   eps : 0.2

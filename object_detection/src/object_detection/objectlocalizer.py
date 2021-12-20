@@ -61,7 +61,7 @@ class ObjectLocalizer:
 
     def method_hdbscan_closeness(self,in_BB_3D, center_id, obj_class):
         
-        cluster = DBSCAN(eps=self.obj_conf[obj_class]["eps"], min_samples=2).fit(in_BB_3D)
+        cluster = DBSCAN(eps=self.obj_conf[obj_class]["eps"], min_samples=2).fit(in_BB_3D[:,:2])
        
         uniq = np.unique(cluster.labels_)
 
