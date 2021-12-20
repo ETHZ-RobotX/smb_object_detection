@@ -172,11 +172,7 @@ def transformstamped_(frame_id, child_id, time, pose, rot):
 
     return t
 
-def pointcloud_filter_ground(xyz):
-    min_z = min(xyz[:,2])
 
-    non_ground_indices = np.argwhere(xyz[:,2] > min_z*0.85).flatten()
-    return(xyz[non_ground_indices])
 
 def param_array_parser(param_array):
     if param_array != 'None':

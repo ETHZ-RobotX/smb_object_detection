@@ -1,4 +1,5 @@
-model_method : hdbscan  
+model_method : hdbscan
+ground_percentage : 0.85  
 
 objects:  
   person:
