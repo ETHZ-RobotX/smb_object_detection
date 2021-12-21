@@ -1,14 +1,18 @@
 import numpy as np
 
 from geometry_msgs.msg import Pose, TransformStamped
-from visualization_msgs.msg import Marker, MarkerArray
+from visualization_msgs.msg import Marker
 
 
-def marker_(ns, marker_id, pos, stamp ,color, type="all"):
+CLASS_COLOR = {'person'  : np.array([255,0,0]),
+               'bicycle' : np.array([0,255,0]),
+               'umbrella': np.array([0,0,255])}
+
+def marker_(ns, marker_id, pos, stamp ,color, frame_id = "map"):
     
     marker = Marker()
     marker.ns = str(ns)
-    marker.header.frame_id = "map"
+    marker.header.frame_id = frame_id
     marker.header.stamp = stamp
     marker.type = 2
     marker.action = 0
@@ -28,19 +32,11 @@ def marker_(ns, marker_id, pos, stamp ,color, type="all"):
     marker.color.b = color[2]
     marker.color.a = 1.0
 
-    if type=="mean":
-        marker.id = 10000
-
-        marker.scale.x = 0.1
-        marker.scale.y = 0.1
-        marker.scale.z = 1.0
-    else:
-        
-        marker.id = marker_id
-        
-        marker.scale.x = 0.1
-        marker.scale.y = 0.1
-        marker.scale.z = 0.3
+    marker.id = marker_id
+    
+    marker.scale.x = 0.2
+    marker.scale.y = 0.2
+    marker.scale.z = 1.0
 
 
     marker.frame_locked = False

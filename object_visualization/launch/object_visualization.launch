@@ -1,0 +1,13 @@
+<launch>
+  <include file="$(find smb_description)/launch/debug.launch">
+    <arg name="visualize" value="1"/>
+  </include>
+
+  <node name="object_visualization" pkg="object_visualization" type="node.py" output="screen">
+    <param name="object_topic" value='/objects'/>
+    <param name="out_image_pub_topic" value='/versavis/cam0/objects'/>
+    <param name="visualize_all" value='False'/>
+    <param name="map_frame" value='map'/>
+  </node>
+  
+</launch>

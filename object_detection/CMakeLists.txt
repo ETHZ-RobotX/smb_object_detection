@@ -12,6 +12,8 @@ find_package(catkin REQUIRED COMPONENTS
   rospy
   ros_numpy
   std_msgs
+  geometry_msgs
+  sensor_msgs
   message_generation
 )
 
@@ -49,11 +51,11 @@ catkin_python_setup()
 ##   * add every package in MSG_DEP_SET to generate_messages(DEPENDENCIES ...)
 
 ## Generate messages in the 'msg' folder
-# add_message_files(
-#   FILES
-#   Message1.msg
-#   Message2.msg
-# )
+add_message_files(
+  FILES
+  ObjectDetection.msg
+  ObjectDetectionArray.msg
+)
 
 ## Generate services in the 'srv' folder
 # add_service_files(
@@ -70,10 +72,12 @@ catkin_python_setup()
 # )
 
 ## Generate added messages and services with any dependencies listed here
-# generate_messages(
-#   DEPENDENCIES
-#   std_msgs
-# )
+generate_messages(
+  DEPENDENCIES
+  std_msgs
+  geometry_msgs
+  sensor_msgs
+)
 
 ################################################
 ## Declare ROS dynamic reconfigure parameters ##
@@ -107,7 +111,7 @@ catkin_python_setup()
 catkin_package(
 #  INCLUDE_DIRS include
 #  LIBRARIES object_detection
-#  CATKIN_DEPENDS roscpp rospy std_msgs
+CATKIN_DEPENDS message_runtime
 #  DEPENDS system_lib
 )
 
@@ -171,7 +175,6 @@ install(DIRECTORY launch
 catkin_install_python(PROGRAMS
   src/node.py
   src/node_refactor.py
-  src/camera.py
   ${python_scripts_DIR}
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
