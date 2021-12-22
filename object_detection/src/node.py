@@ -12,7 +12,6 @@ from object_detection.msg import ObjectDetection, ObjectDetectionArray
 from object_detection.objectdetector import ObjectDetector
 from object_detection.pointprojector import PointProjector
 from object_detection.objectlocalizer import ObjectLocalizer
-from object_detection.utils import *
 
 import warnings
 warnings.filterwarnings("ignore")
