@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from scipy.signal import find_peaks
 from scipy.sparse import data
 from sklearn.cluster import DBSCAN, OPTICS
+from torch._C import dtype
 import yaml
 
 @dataclass
@@ -99,7 +100,7 @@ class ObjectLocalizer:
 
     def method_hdbscan_closeness(self,in_BB_3D, center_id, obj_class):
         
-        cluster = DBSCAN(eps=self.obj_conf[obj_class]["eps"], min_samples=2).fit(in_BB_3D)
+        cluster = DBSCAN(eps=self.obj_conf[obj_class]["eps"], min_samples=2).fit(in_BB_3D[:,:2])
        
         uniq = np.unique(cluster.labels_)
 
@@ -241,7 +242,7 @@ class ObjectLocalizer:
             except:
                 continue
             object_poses = np.vstack((object_poses, pos))
-            on_object_list.append(np.squeeze(on_object))
+            on_object_list.append(np.array(non_ground[np.squeeze(on_object)], dtype=np.int32))
         return object_poses, on_object_list
 
                  

@@ -4,9 +4,9 @@ from geometry_msgs.msg import Pose, TransformStamped
 from visualization_msgs.msg import Marker
 
 
-CLASS_COLOR = {'person'  : np.array([255,0,0]),
-               'bicycle' : np.array([0,255,0]),
-               'umbrella': np.array([0,0,255])}
+CLASS_COLOR = {'person'  : (255,0,0),
+               'bicycle' : (0,255,0),
+               'umbrella': (0,0,255)}
 
 def marker_(ns, marker_id, pos, stamp ,color, frame_id = "map"):
     

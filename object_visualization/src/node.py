@@ -18,8 +18,9 @@ class Node:
 
         rospy.init_node("visualize", anonymous=True)
 
-        self.object_pub_topic               = rospy.get_param('~object_topic', '/objects')
+        self.object_topic                   = rospy.get_param('~object_topic', '/objects')
         self.image_pub_topic                = rospy.get_param('~out_image_pub_topic', "/versavis/cam0/objects")
+        self.marker_pub_topic               = rospy.get_param('~marker_pub_topic', "/objects/markers")
         self.visualize_all                  = rospy.get_param('~visualize_all', False)
         self.map_frame                      = rospy.get_param('~map_frame', 'map')
 
@@ -28,16 +29,10 @@ class Node:
         self.TF_br                          = tf2_ros.StaticTransformBroadcaster()
         self.cv_bridge                      = CvBridge()
 
-        self.marker_pub                     = rospy.Publisher(self.object_pub_topic , MarkerArray, queue_size=10)
-        self.image_pub                  = rospy.Publisher(self.image_pub_topic , Image, queue_size=5)
+        self.marker_pub                     = rospy.Publisher(self.marker_pub_topic , MarkerArray, queue_size=10)
+        self.image_pub                      = rospy.Publisher(self.image_pub_topic , Image, queue_size=5)
 
-        self.obj_id                         = 0
-        self.marker_color                   = {}
 
-        if self.objectdetector_cfg['classes'] is not None:
-            for c in self.objectdetector_cfg['classes']:
-                self.marker_color [c] = np.random.rand(3)
-    
     def object_callback(self, detection):
         img = self.cv_bridge.imgmsg_to_cv2(detection.detections_image , "bgr8")
         point_cloud_2D = ros_numpy.point_cloud2.pointcloud2_to_xyz_array(detection.pointcloud_in_frame_2D)
@@ -48,19 +43,18 @@ class Node:
             for idx, pt in enumerate(point_cloud_2D): 
                 dist = point_cloud_3D[idx, 2]
                 color = depth_color(dist, min_d=0.2, max_d=20)
-
                 try:
-                    cv2.circle(img, pt[:2], 1, color)
+                    cv2.circle(img, pt[:2].astype(np.int32), 1, color)
                 except:
                     print("Cannot Circle")
         else:
             for idx, object in enumerate(objects):
-                on_obj_indices = object.on_object_point_indices
+                on_obj_indices = np.array(object.on_object_point_indices)
                 obj_class = object.class_id
-                for idx, pt in enumerate(point_cloud_2D[on_obj_indices]): 
+                for idx, pt in enumerate(point_cloud_2D[on_obj_indices,:]): 
                     dist = point_cloud_3D[idx, 2]
                     try:
-                        cv2.circle(img, pt[:2], 1, CLASS_COLOR[obj_class])
+                        cv2.circle(img, pt[:2].astype(np.int32), 1, CLASS_COLOR[obj_class])
                     except:
                         print("Cannot Circle")
         
@@ -89,8 +83,8 @@ class Node:
             obj_in_map = np.array([transform.transform.translation.x, \
                                     transform.transform.translation.y, \
                                     transform.transform.translation.z ])
-
-            markers.markers.append(marker_(obj_class + str(obj_id), obj_id, obj_in_map, detection.header.stamp, CLASS_COLOR[obj_class]/255.0, self.map_frame))
+            color = np.array(CLASS_COLOR[obj_class]) / 255.0
+            markers.markers.append(marker_(obj_class + str(obj_id), obj_id, obj_in_map, detection.header.stamp, color, self.map_frame))
 
         self.marker_pub.publish(markers)  
 

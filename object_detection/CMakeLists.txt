@@ -174,7 +174,6 @@ install(DIRECTORY launch
 ## in contrast to setup.py, you can choose the destination
 catkin_install_python(PROGRAMS
   src/node.py
-  src/node_refactor.py
   ${python_scripts_DIR}
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
