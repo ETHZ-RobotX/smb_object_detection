@@ -1,21 +1,36 @@
 import numpy as np
+from dataclasses import dataclass
 from scipy.signal import find_peaks
+from scipy.sparse import data
 from sklearn.cluster import DBSCAN, OPTICS
+from torch._C import dtype
 import yaml
 
-from skimage.metrics import structural_similarity as compare_ssim
+NO_POSE = -1
 
+@dataclass
+class BoundingBox:
+    min_x : int
+    min_y : int
+    max_x : int
+    max_y : int
 
-from object_detection.object import Object
+@dataclass
+class Object:
+    object_class  : str
+    in_BB_indices : np.array
+    in_BB_center_index : int
+    BB : BoundingBox
+
 
 class ObjectLocalizer:
     def __init__(self, config):
-        self.model_method       = config["model_method"]
-        self.config_file        = config["localizer_config"]
-        self.i = 0
 
-        with open(self.config_file) as file:
-            self.obj_conf = yaml.load(file, Loader=yaml.FullLoader)
+        with open(config) as file:
+            self.config             = yaml.load(file, Loader=yaml.FullLoader)
+            self.obj_conf           = self.config['objects']
+            self.model_method       = self.config["model_method"].lower()
+            self.ground_percentage  = self.config["ground_percentage"]
 
     def save_scene(self, objects_BB, points2D, points3D, image=None ):
         """
@@ -29,6 +44,32 @@ class ObjectLocalizer:
         self.points2D   = points2D
         self.image      = image
     
+    def get_front(self, object0, object1):
+        only_in_0 = np.setxor1d(object0.in_BB_indices, object1.in_BB_indices)
+        only_in_1 = np.setxor1d(object1.in_BB_indices, object0.in_BB_indices)
+
+        if len(only_in_0) == 0:
+            return 0
+
+        if len(only_in_1) == 0:
+            return 1 
+
+    def is_overlapping(self, bb1, bb2):
+        return (bb1.x_max >= bb2.x_min) and (bb2.x_max >= bb1.x_min) and \
+               (bb1.y_max >= bb2.y_min) and (bb2.y_max >= bb1.y_min)
+
+    def filter_ground(self, point3D):
+        """
+        Args:
+            index                   : 3D point translated point cloud 
+
+        Returns:
+            non_ground_indices      : indices of points that are not ground
+        """
+        # min z has a negative value
+        return np.argwhere(point3D[:,2] > min(point3D[:,2])*self.ground_percentage).flatten()
+
+
     def points_in_BB(self, index, contract_percentage_bottom=10, contract_percentage_top=10, contract_percentage_sides=10 ):
         """
         Args:
@@ -37,6 +78,8 @@ class ObjectLocalizer:
                     
         Returns:
             inside_BB               : indices of points inside the BB
+            center_ind              : index of the point that is closest to the center of the object BB
+            center                  : pixel coordinates of the center of the object
         """
 
         x_diff = self.objects_BB['xmax'][index] - self.objects_BB['xmin'][index]
@@ -52,10 +95,12 @@ class ObjectLocalizer:
         center = np.array([(self.objects_BB['xmin'][index]+self.objects_BB['xmax'][index])/2.0, \
                   (self.objects_BB['ymin'][index]+self.objects_BB['ymax'][index])/2.0 ])
 
-        try:
+
+        if len(inside_BB) == 0:
+            inside_BB = np.array([NO_POSE])
+            center_ind = NO_POSE
+        else:
             center_ind = np.argmin(np.linalg.norm(self.points2D[inside_BB, :] - center, axis=1))
-        except:
-            center_ind = len(inside_BB) /2 
 
         return inside_BB, center_ind, center
 
@@ -90,27 +135,22 @@ class ObjectLocalizer:
             weights = weights + 1
 
         avg =  np.ma.average(in_BB_3D[indices], axis=0, weights=weights)
-        # avg[:2] = in_BB_3D[center_id, :2]
+        
         center_point = in_BB_3D[center_id]
         center_point[:2] = center_point[:2] * (avg[2] / center_point[2])
         avg[:2] = center_point[:2]
 
         return avg, indices
-
-    def method_optics_closeness(self,in_BB_3D):
-        
-        cluster = OPTICS(min_samples=2).fit(in_BB_3D)
+    
+    def method_kMeans(self,in_BB_3D):
        
+        cluster = DBSCAN(eps=0.3, min_samples=1).fit(in_BB_3D)
         uniq = np.unique(cluster.labels_)
 
         min_val = 100000
         indices = None
 
         for i in uniq:
-            
-            if i == -1:
-                continue
-
             indices_ = np.squeeze(np.argwhere(cluster.labels_ == i))
             min_val_ = np.mean(np.linalg.norm(in_BB_3D[indices_], axis=1))
 
@@ -118,16 +158,10 @@ class ObjectLocalizer:
                 indices = indices_
                 min_val = min_val_
 
-        distances = np.linalg.norm(np.squeeze(in_BB_3D[indices]), axis=1)
-        
-        weights = np.abs(distances - max(distances))**2
-
-        if np.sum(weights) == 0:
-            weights = weights + 1
-
-        avg =  np.ma.average(in_BB_3D[indices], axis=0, weights=weights)
-
-        return avg, indices
+        if len(indices) > 1:
+            return np.mean(in_BB_3D[indices],axis=0), indices
+        else:
+            return in_BB_3D[indices], indices
 
     def method_hdbscan(self,in_BB_3D):
        
@@ -175,24 +209,6 @@ class ObjectLocalizer:
         
         return np.mean(in_BB_3D[inside_peak, :], axis=0), inside_peak
     
-    def method_histogram_dist(self,in_BB_3D):
-        
-        dsitances = np.linalg.norm(in_BB_3D, axis=1)
-
-        _, bin_edges = np.histogram(dsitances, 2)
-
-        """
-        plt.plot(bin_edges, hist)
-        plt.plot(bin_edges[peaks], hist[peaks], "x")
-        plt.savefig('/home/oilter/Downloads/foo.png')
-        plt.close()
-        """        
-
-        inside_peak = np.logical_and((dsitances >= bin_edges[0]), \
-                                     (dsitances < bin_edges[1]))
-        
-        return np.mean(in_BB_3D[inside_peak, :], axis=0), inside_peak
-
     def get_object_pos(self, index):
         """        
         Args:
@@ -209,24 +225,32 @@ class ObjectLocalizer:
                                             contract_percentage_top    = self.obj_conf[obj_class]['contract_percentage_top'], \
                                             contract_percentage_sides  = self.obj_conf[obj_class]['contract_percentage_sides'])
 
-        in_BB_3D = self.points3D[in_BB_indices, :]
-        in_BB_2D = self.points2D[in_BB_indices, :]
+        # If no points falls inside the BB
+        if center_ind == NO_POSE :
+            on_object_ind = np.array([NO_POSE])
+            pos           = np.array([0,0, NO_POSE])
+            center_ind = NO_POSE
 
+        else:
+            in_BB_3D = self.points3D[in_BB_indices, :]
+            in_BB_2D = self.points2D[in_BB_indices, :]
 
-        on_object = np.arange(0,in_BB_3D.shape[0])
+            on_object = np.arange(0,in_BB_3D.shape[0])
 
-        if self.model_method == "mean":
-            pos = np.mean(in_BB_3D, axis=0)
-        elif self.model_method == "median":
-            pos = np.median(in_BB_3D, axis=0)
-        elif self.model_method == "centre":
-            pos = in_BB_3D[center_ind,:]
-        elif self.model_method == "histogram":
-            pos, on_object = self.method_histogram(in_BB_3D)
-        elif self.model_method == "hdbscan":
-            pos, on_object = self.method_hdbscan_closeness(in_BB_3D, center_ind, obj_class)
+            if self.model_method == "hdbscan":
+                pos, on_object = self.method_hdbscan_closeness(in_BB_3D, center_ind, obj_class)
+            elif self.model_method == "mean":
+                pos = np.mean(in_BB_3D, axis=0)
+            elif self.model_method == "median":
+                pos = np.median(in_BB_3D, axis=0)
+            elif self.model_method == "centre":
+                pos = in_BB_3D[center_ind,:]
+            elif self.model_method == "histogram":
+                pos, on_object = self.method_histogram(in_BB_3D)
+            
+            on_object_ind = in_BB_indices[on_object]
 
-        return pos, in_BB_indices[on_object]
+        return pos, on_object_ind
 
     def localize(self, objects_BB, points2D, points3D, image=None):
         """
@@ -237,20 +261,27 @@ class ObjectLocalizer:
             method         : method to calculate position of object
         
         Returns:
-            pos             : nx3 numpy array, position of the objects acc. camera frame
+            object_poses   : nx3 numpy array, position of the objects acc. camera frame
+            on_object_list : n size list of arrays that contains indices of points that fall onto the object for every object
 
-        
         """
-        self.save_scene(objects_BB, points2D, points3D, image)
+
+        non_ground = self.filter_ground(points3D)
+
+        self.save_scene(objects_BB, points2D[non_ground], points3D[non_ground], image)
         object_poses = np.empty((0,3))
         on_object_list = []
         for ind in range(len(self.objects_BB)):
-            try:
-                pos, on_object = self.get_object_pos(ind)
-            except:
-                continue
+
+            pos, on_object = self.get_object_pos(ind)
+
+            if on_object[0] == NO_POSE:
+                on_object_list.append(on_object)
+            else:
+                on_object_list.append(np.array(non_ground[np.squeeze(on_object)], dtype=np.int32))
+
             object_poses = np.vstack((object_poses, pos))
-            on_object_list.append(np.squeeze(on_object))
+            
         return object_poses, on_object_list
 
                  
