@@ -3,18 +3,18 @@ ground_percentage : 0.85
 
 objects:  
   person:
-    eps : 0.15
+    eps : 0.3
     contract_percentage_bottom : 10
     contract_percentage_top : 10
     contract_percentage_sides : 10 
     max_depth : 0.3 
 
   bicycle:
-    eps : 0.2
+    eps : 0.3
     contract_percentage_bottom : 10
     contract_percentage_top : 10
     contract_percentage_sides : 15 
-    max_depth : 0.15  
+    max_depth : 0.4  
 
   car:
     eps : 0.2

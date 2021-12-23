@@ -13,6 +13,7 @@ from object_visualization.msg import ObjectDetection, ObjectDetectionArray
 
 from object_visualization.utils import *
 
+
 class Node:
     def __init__(self):
 
@@ -50,13 +51,19 @@ class Node:
         else:
             for idx, object in enumerate(objects):
                 on_obj_indices = np.array(object.on_object_point_indices)
+
+                # No pose estimation for the object
+                # No points fall into Bounding Box
+                if on_obj_indices[0] == NO_POSE:
+                    continue
+
                 obj_class = object.class_id
                 for idx, pt in enumerate(point_cloud_2D[on_obj_indices,:]): 
                     dist = point_cloud_3D[idx, 2]
                     try:
                         cv2.circle(img, pt[:2].astype(np.int32), 1, CLASS_COLOR[obj_class])
                     except:
-                        print("Cannot Circle")
+                        print("Cannot Circle \n")
         
         img_msg = self.cv_bridge.cv2_to_imgmsg(img, 'bgr8')
         img_msg.header.frame_id = detection.header.frame_id
@@ -64,6 +71,13 @@ class Node:
 
         markers = MarkerArray()
         for idx, object in enumerate(objects):
+
+            # No pose estimation for the object
+            # No points fall into Bounding Box
+            if object.pose.z == NO_POSE:
+                print("Object with no pose \n")
+                continue
+
             obj_class = object.class_id
             obj_id = object.id
 
@@ -77,13 +91,13 @@ class Node:
                                                                 obj_class + str(obj_id), detection.header.stamp, \
                                                                 self.map_frame, rospy.Duration(2.0))
             except:
-                print("cannot transform")
+                print("cannot transform \n")
                 continue
 
             obj_in_map = np.array([transform.transform.translation.x, \
                                     transform.transform.translation.y, \
                                     transform.transform.translation.z ])
-            color = np.array(CLASS_COLOR[obj_class]) / 255.0
+            color = np.flip(np.array(CLASS_COLOR[obj_class]) / 255.0)
             markers.markers.append(marker_(obj_class + str(obj_id), obj_id, obj_in_map, detection.header.stamp, color, self.map_frame))
 
         self.marker_pub.publish(markers)  

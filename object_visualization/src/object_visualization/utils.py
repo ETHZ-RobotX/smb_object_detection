@@ -3,6 +3,7 @@ import numpy as np
 from geometry_msgs.msg import Pose, TransformStamped
 from visualization_msgs.msg import Marker
 
+NO_POSE = -1
 
 CLASS_COLOR = {'person'  : (255,0,0),
                'bicycle' : (0,255,0),

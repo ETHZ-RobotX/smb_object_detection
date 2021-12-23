@@ -119,9 +119,6 @@ class Node:
                 
                 self.seq = self.seq + 1 if self.seq < UINT32-1 else 0
 
-                print(object_detection_result)
-                print(len(on_object_list))
-
                 # For every detected image object
                 for i in range(len(object_detection_result)):
                     object_detection = ObjectDetection()
@@ -134,7 +131,10 @@ class Node:
                     object_detection.bounding_box_max_x = int(object_detection_result['xmax'][i])
                     object_detection.bounding_box_max_y = int(object_detection_result['ymax'][i])
 
-                    object_detection.on_object_point_indices = on_object_list[i] if len(np.atleast_1d(on_object_list[i]))>1 else [on_object_list[i]]
+                    try:
+                        object_detection.on_object_point_indices = on_object_list[i] if len(np.atleast_1d(on_object_list[i]))>1 else [on_object_list[i]]
+                    except:
+                        continue
 
                     object_detection.pose.x = object_poses[i][0]
                     object_detection.pose.y = object_poses[i][1]

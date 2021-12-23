@@ -6,6 +6,8 @@ from sklearn.cluster import DBSCAN, OPTICS
 from torch._C import dtype
 import yaml
 
+NO_POSE = -1
+
 @dataclass
 class BoundingBox:
     min_x : int
@@ -76,6 +78,8 @@ class ObjectLocalizer:
                     
         Returns:
             inside_BB               : indices of points inside the BB
+            center_ind              : index of the point that is closest to the center of the object BB
+            center                  : pixel coordinates of the center of the object
         """
 
         x_diff = self.objects_BB['xmax'][index] - self.objects_BB['xmin'][index]
@@ -91,10 +95,12 @@ class ObjectLocalizer:
         center = np.array([(self.objects_BB['xmin'][index]+self.objects_BB['xmax'][index])/2.0, \
                   (self.objects_BB['ymin'][index]+self.objects_BB['ymax'][index])/2.0 ])
 
-        try:
+
+        if len(inside_BB) == 0:
+            inside_BB = np.array([NO_POSE])
+            center_ind = NO_POSE
+        else:
             center_ind = np.argmin(np.linalg.norm(self.points2D[inside_BB, :] - center, axis=1))
-        except:
-            center_ind = len(inside_BB) /2 
 
         return inside_BB, center_ind, center
 
@@ -135,6 +141,27 @@ class ObjectLocalizer:
         avg[:2] = center_point[:2]
 
         return avg, indices
+    
+    def method_kMeans(self,in_BB_3D):
+       
+        cluster = DBSCAN(eps=0.3, min_samples=1).fit(in_BB_3D)
+        uniq = np.unique(cluster.labels_)
+
+        min_val = 100000
+        indices = None
+
+        for i in uniq:
+            indices_ = np.squeeze(np.argwhere(cluster.labels_ == i))
+            min_val_ = np.mean(np.linalg.norm(in_BB_3D[indices_], axis=1))
+
+            if min_val_ < min_val:
+                indices = indices_
+                min_val = min_val_
+
+        if len(indices) > 1:
+            return np.mean(in_BB_3D[indices],axis=0), indices
+        else:
+            return in_BB_3D[indices], indices
 
     def method_hdbscan(self,in_BB_3D):
        
@@ -198,24 +225,32 @@ class ObjectLocalizer:
                                             contract_percentage_top    = self.obj_conf[obj_class]['contract_percentage_top'], \
                                             contract_percentage_sides  = self.obj_conf[obj_class]['contract_percentage_sides'])
 
-        in_BB_3D = self.points3D[in_BB_indices, :]
-        in_BB_2D = self.points2D[in_BB_indices, :]
+        # If no points falls inside the BB
+        if center_ind == NO_POSE :
+            on_object_ind = np.array([NO_POSE])
+            pos           = np.array([0,0, NO_POSE])
+            center_ind = NO_POSE
 
+        else:
+            in_BB_3D = self.points3D[in_BB_indices, :]
+            in_BB_2D = self.points2D[in_BB_indices, :]
 
-        on_object = np.arange(0,in_BB_3D.shape[0])
+            on_object = np.arange(0,in_BB_3D.shape[0])
 
-        if self.model_method == "hdbscan":
-            pos, on_object = self.method_hdbscan_closeness(in_BB_3D, center_ind, obj_class)
-        elif self.model_method == "mean":
-            pos = np.mean(in_BB_3D, axis=0)
-        elif self.model_method == "median":
-            pos = np.median(in_BB_3D, axis=0)
-        elif self.model_method == "centre":
-            pos = in_BB_3D[center_ind,:]
-        elif self.model_method == "histogram":
-            pos, on_object = self.method_histogram(in_BB_3D)
+            if self.model_method == "hdbscan":
+                pos, on_object = self.method_hdbscan_closeness(in_BB_3D, center_ind, obj_class)
+            elif self.model_method == "mean":
+                pos = np.mean(in_BB_3D, axis=0)
+            elif self.model_method == "median":
+                pos = np.median(in_BB_3D, axis=0)
+            elif self.model_method == "centre":
+                pos = in_BB_3D[center_ind,:]
+            elif self.model_method == "histogram":
+                pos, on_object = self.method_histogram(in_BB_3D)
+            
+            on_object_ind = in_BB_indices[on_object]
 
-        return pos, in_BB_indices[on_object]
+        return pos, on_object_ind
 
     def localize(self, objects_BB, points2D, points3D, image=None):
         """
@@ -226,9 +261,9 @@ class ObjectLocalizer:
             method         : method to calculate position of object
         
         Returns:
-            pos             : nx3 numpy array, position of the objects acc. camera frame
+            object_poses   : nx3 numpy array, position of the objects acc. camera frame
+            on_object_list : n size list of arrays that contains indices of points that fall onto the object for every object
 
-        
         """
 
         non_ground = self.filter_ground(points3D)
@@ -237,12 +272,16 @@ class ObjectLocalizer:
         object_poses = np.empty((0,3))
         on_object_list = []
         for ind in range(len(self.objects_BB)):
-            try:
-                pos, on_object = self.get_object_pos(ind)
-            except:
-                continue
+
+            pos, on_object = self.get_object_pos(ind)
+
+            if on_object[0] == NO_POSE:
+                on_object_list.append(on_object)
+            else:
+                on_object_list.append(np.array(non_ground[np.squeeze(on_object)], dtype=np.int32))
+
             object_poses = np.vstack((object_poses, pos))
-            on_object_list.append(np.array(non_ground[np.squeeze(on_object)], dtype=np.int32))
+            
         return object_poses, on_object_list
 
                  
