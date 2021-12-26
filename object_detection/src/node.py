@@ -56,13 +56,15 @@ class Node:
         self.multiple_instance              = rospy.get_param('~multiple_instance', False)
 
         # ---------- 3D Object Localizer Related ----------
-        self.objectlocalizer_cfg            = rospy.get_param('~localizer_config', None) 
+        self.objectlocalizer_cfg            = rospy.get_param('~localizer_config', None)
+        self.objectlocalizer_save_data      = rospy.get_param('~objectlocalizer_save_data', False)
+        self.objectlocalizer_data_dir       = rospy.get_param('~objectlocalizer_data_dir', False)
 
         # ---------- Objects of Actions ----------
         self.imagereader                    = CvBridge()
         self.pointprojector                 = PointProjector(self.reproject_cfg)
         self.objectdetector                 = ObjectDetector(self.objectdetector_cfg)           
-        self.objectlocalizer                = ObjectLocalizer(self.objectlocalizer_cfg)
+        self.objectlocalizer                = ObjectLocalizer(self.objectlocalizer_cfg, self.objectlocalizer_data_dir, self.objectlocalizer_save_data)
         
         rospy.loginfo("Detector is set")
     
@@ -98,10 +100,10 @@ class Node:
                 object_detection_result, object_detection_image = self.objectdetector.detect(cv_image, multiple_instance = self.multiple_instance)
                 
                 # Localize every detected object
-                object_poses, on_object_list = self.objectlocalizer.localize(object_detection_result, \
-                                                                             pointcloud_on_image, \
-                                                                             pointcloud_in_FoV, \
-                                                                             cv_image  )
+                object_poses_list, on_object_list = self.objectlocalizer.localize(object_detection_result, \
+                                                                                  pointcloud_on_image, \
+                                                                                  pointcloud_in_FoV, \
+                                                                                  cv_image  )
 
                 # Convert arrays to correct format
                 pointcloud_on_image = np.c_[ pointcloud_on_image, np.zeros(pointcloud_on_image.shape[0]) ]
@@ -136,9 +138,9 @@ class Node:
                     except:
                         continue
 
-                    object_detection.pose.x = object_poses[i][0]
-                    object_detection.pose.y = object_poses[i][1]
-                    object_detection.pose.z = object_poses[i][2]
+                    object_detection.pose.x = object_poses_list[i][0]
+                    object_detection.pose.y = object_poses_list[i][1]
+                    object_detection.pose.z = object_poses_list[i][2]
                     
                     object_detection_array.detections.append(object_detection)
 

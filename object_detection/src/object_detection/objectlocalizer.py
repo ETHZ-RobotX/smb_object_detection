@@ -1,9 +1,8 @@
+import os
 import numpy as np
 from dataclasses import dataclass
 from scipy.signal import find_peaks
-from scipy.sparse import data
-from sklearn.cluster import DBSCAN, OPTICS
-from torch._C import dtype
+from sklearn.cluster import DBSCAN
 import yaml
 
 NO_POSE = -1
@@ -24,7 +23,10 @@ class Object:
 
 
 class ObjectLocalizer:
-    def __init__(self, config):
+    def __init__(self, config, data_dir, data_save):
+
+        self.data_save = data_save
+        self.data_dir = data_dir
 
         with open(config) as file:
             self.config             = yaml.load(file, Loader=yaml.FullLoader)
@@ -54,10 +56,6 @@ class ObjectLocalizer:
         if len(only_in_1) == 0:
             return 1 
 
-    def is_overlapping(self, bb1, bb2):
-        return (bb1.x_max >= bb2.x_min) and (bb2.x_max >= bb1.x_min) and \
-               (bb1.y_max >= bb2.y_min) and (bb2.y_max >= bb1.y_min)
-
     def filter_ground(self, point3D):
         """
         Args:
@@ -68,7 +66,6 @@ class ObjectLocalizer:
         """
         # min z has a negative value
         return np.argwhere(point3D[:,2] > min(point3D[:,2])*self.ground_percentage).flatten()
-
 
     def points_in_BB(self, index, contract_percentage_bottom=10, contract_percentage_top=10, contract_percentage_sides=10 ):
         """
@@ -258,19 +255,20 @@ class ObjectLocalizer:
             objects_BB     : 2D object detection results in Panda Dataframe 
             points2D       : 2D Point cloud in camera frame on the image
             points3D       : 3D Point cloud in camera frame 
-            method         : method to calculate position of object
+            image          : rgb image of detection
         
         Returns:
-            object_poses   : nx3 numpy array, position of the objects acc. camera frame
+            object_poses   : n size list of arrays that contains position of the objects acc. camera frame
             on_object_list : n size list of arrays that contains indices of points that fall onto the object for every object
 
         """
 
         non_ground = self.filter_ground(points3D)
-
         self.save_scene(objects_BB, points2D[non_ground], points3D[non_ground], image)
-        object_poses = np.empty((0,3))
+
+        object_poses = []
         on_object_list = []
+
         for ind in range(len(self.objects_BB)):
 
             pos, on_object = self.get_object_pos(ind)
@@ -280,8 +278,46 @@ class ObjectLocalizer:
             else:
                 on_object_list.append(np.array(non_ground[np.squeeze(on_object)], dtype=np.int32))
 
-            object_poses = np.vstack((object_poses, pos))
+                if self.data_save:
+                    self.save_data(ind, pos)
+
+            object_poses.append(pos)
             
         return object_poses, on_object_list
 
                  
+    def save_data(self, ind, pose):
+
+        for i in range(len(self.objects_BB)): 
+
+            if ind == i :
+                continue
+
+            if self.is_overlapping(ind, i):
+                return
+        
+        obj_class = self.objects_BB["name"][ind]
+        bb_size = self.object_unique_size(ind, self.obj_conf[obj_class]['unique'])
+
+        txt = obj_class + ".txt"
+        input = str(bb_size) + " " + str(pose[2]) + "\n"
+        with open( os.path.join( self.data_dir, txt ), 'a' ) as file:
+            file.write(input)
+
+    def object_unique_size(self, ind, unique):
+        if unique == 'x':
+            size = self.objects_BB['xmax'][ind] - self.objects_BB['xmin'][ind]
+        elif unique == 'y':
+            size = self.objects_BB['ymax'][ind] - self.objects_BB['ymin'][ind]
+        else :
+            min_p = np.array( [self.objects_BB['xmin'][ind], self.objects_BB['ymin'][ind]] )
+            max_p = np.array( [self.objects_BB['xmax'][ind], self.objects_BB['ymax'][ind]] )
+            size = np.linalg.norm(max_p - min_p)
+
+        return size
+
+    def is_overlapping(self, ind1, ind2):
+        return (self.objects_BB['xmax'][ind1] >= self.objects_BB['xmin'][ind2]) and \
+               (self.objects_BB['xmax'][ind2] >= self.objects_BB['xmin'][ind1]) and \
+               (self.objects_BB['ymax'][ind1] >= self.objects_BB['ymin'][ind2]) and \
+               (self.objects_BB['ymax'][ind2] >= self.objects_BB['ymin'][ind1]) 
