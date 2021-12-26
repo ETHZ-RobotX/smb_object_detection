@@ -56,16 +56,23 @@ class ObjectLocalizer:
         if len(only_in_1) == 0:
             return 1 
 
-    def filter_ground(self, point3D):
+    def filter_ground(self, point3D, upward):
         """
         Args:
-            index                   : 3D point translated point cloud 
+            point3D                   : 3D point translated point cloud 
 
         Returns:
-            non_ground_indices      : indices of points that are not ground
+            non_groun_point3D         : indices of points that are not ground
         """
-        # min z has a negative value
-        return np.argwhere(point3D[:,2] > min(point3D[:,2])*self.ground_percentage).flatten()
+
+        if upward < 0:
+            indices = np.nonzero(point3D[:,-upward] < max(point3D[:,-upward])*self.ground_percentage)[0]
+            
+        else:
+            indices = np.nonzero(point3D[:,upward] > min(point3D[:,upward])*self.ground_percentage)[0]
+        
+        return point3D[indices]
+               
 
     def points_in_BB(self, index, contract_percentage_bottom=10, contract_percentage_top=10, contract_percentage_sides=10 ):
         """
@@ -101,29 +108,31 @@ class ObjectLocalizer:
 
         return inside_BB, center_ind, center
 
-    def method_hdbscan_closeness(self,in_BB_3D, center_id, obj_class):
+    def method_hdbscan_closeness(self,in_BB_3D, center_id, obj_class, estimated_dist = 0):
         
-        cluster = DBSCAN(eps=self.obj_conf[obj_class]["eps"], min_samples=2).fit(in_BB_3D[:,:2])
+        cluster = DBSCAN(eps=self.obj_conf[obj_class]["eps"], min_samples=2).fit(in_BB_3D[:,[0,2]])
        
         uniq = np.unique(cluster.labels_)
 
         min_val = 100000
         indices = None
 
+        
         for i in uniq:
             
             if i == -1:
                 continue
 
-            indices_ = np.squeeze(np.argwhere(cluster.labels_ == i))
-            min_val_ = np.mean(np.linalg.norm(in_BB_3D[indices_], axis=1))
+            indices_ = np.nonzero(cluster.labels_ == i)[0]
+            min_val_ = np.abs( estimated_dist - np.mean(in_BB_3D[indices_,2]) )
 
             if min_val_ < min_val:
                 indices = indices_
                 min_val = min_val_
 
-        distances = np.linalg.norm(np.squeeze(in_BB_3D[indices]), axis=1)
-        in_range_indices = ( distances - min(distances) ) < self.obj_conf[obj_class]["max_depth"]
+        
+        distances = np.squeeze(in_BB_3D[indices,2])
+        in_range_indices = np.nonzero( ( distances - min(distances) ) < self.obj_conf[obj_class]["max_depth"] )[0]
 
         indices = indices[in_range_indices]
         weights = np.abs(distances[in_range_indices] - max(distances[in_range_indices])) # **2
@@ -136,6 +145,8 @@ class ObjectLocalizer:
         center_point = in_BB_3D[center_id]
         center_point[:2] = center_point[:2] * (avg[2] / center_point[2])
         avg[:2] = center_point[:2]
+         
+        print("Estimated dist: ", estimated_dist, "Pose: ", avg[2])
 
         return avg, indices
     
@@ -234,8 +245,14 @@ class ObjectLocalizer:
 
             on_object = np.arange(0,in_BB_3D.shape[0])
 
+            # estimated_dist = 5.82383393 - 0.00956915 * self.object_unique_size(index, self.obj_conf[obj_class]['unique'])
+
+            p = np.poly1d([-5.54684160e-08,  9.16524366e-05, -5.14082476e-02,  1.13425403e+01])
+            estimated_dist = p(self.object_unique_size(index, self.obj_conf[obj_class]['unique']))
+
+
             if self.model_method == "hdbscan":
-                pos, on_object = self.method_hdbscan_closeness(in_BB_3D, center_ind, obj_class)
+                pos, on_object = self.method_hdbscan_closeness(in_BB_3D, center_ind, obj_class, estimated_dist)
             elif self.model_method == "mean":
                 pos = np.mean(in_BB_3D, axis=0)
             elif self.model_method == "median":
@@ -263,8 +280,7 @@ class ObjectLocalizer:
 
         """
 
-        non_ground = self.filter_ground(points3D)
-        self.save_scene(objects_BB, points2D[non_ground], points3D[non_ground], image)
+        self.save_scene(objects_BB, points2D, points3D, image)
 
         object_poses = []
         on_object_list = []
@@ -276,7 +292,7 @@ class ObjectLocalizer:
             if on_object[0] == NO_POSE:
                 on_object_list.append(on_object)
             else:
-                on_object_list.append(np.array(non_ground[np.squeeze(on_object)], dtype=np.int32))
+                on_object_list.append(np.array(np.squeeze(on_object), dtype=np.int32))
 
                 if self.data_save:
                     self.save_data(ind, pos)

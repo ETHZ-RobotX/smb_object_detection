@@ -89,6 +89,11 @@ class Node:
                 # Read lidar message
                 point_cloud_XYZ = ros_numpy.point_cloud2.pointcloud2_to_xyz_array(lidar_msg)
 
+                # Ground filter 
+                # Upward direction is Z which 3rd column in the matrix
+                # It is positive because it increases upwards
+                point_cloud_XYZ = self.objectlocalizer.filter_ground(point_cloud_XYZ, 2)
+
                 # translate and project PointCloud onto the Image  
                 point_cloud_XYZ = self.pointprojector.translatePoints(point_cloud_XYZ)
                 pointcloud_on_image , pointcloud_in_FoV = self.pointprojector.projectPointsOnImage(point_cloud_XYZ)

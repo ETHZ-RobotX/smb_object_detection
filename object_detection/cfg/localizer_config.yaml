@@ -1,5 +1,5 @@
 model_method : hdbscan
-ground_percentage : 0.85 
+ground_percentage : 0.7
 save_data : False
 
 objects:  
@@ -15,7 +15,7 @@ objects:
     eps : 0.3
     contract_percentage_bottom : 10
     contract_percentage_top : 10
-    contract_percentage_sides : 15 
+    contract_percentage_sides : 10 
     max_depth : 0.4
     unique : y
 

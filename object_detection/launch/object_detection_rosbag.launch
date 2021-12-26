@@ -1,6 +1,6 @@
 <launch>
 
-  <arg name="rosbag_name" default="bike_0_5_smb"/>
+  <arg name="rosbag_name" default="bike_0_13_smb"/>
   <arg name="rosbag_path" default="/media/oilter/D4561E4E561E31AA/SemesterProject/objectsFinal/$(arg rosbag_name).bag"/>
 
   <arg name="camera_calib_path" default="$(find object_detection)/cfg/smb264_camera_model.yaml"/>
@@ -49,7 +49,7 @@
 
     <!--Object localization related-->
     <param name="localizer_config" value='$(find object_detection)/cfg/localizer_config.yaml'/>
-    <param name="objectlocalizer_save_data" value='True'/>
+    <param name="objectlocalizer_save_data" value='False'/>
     <param name="objectlocalizer_data_dir" value='$(find object_detection)/cfg/data'/>
 
   </node>
@@ -58,6 +58,6 @@
     <arg name="object_topic" value="/objects"/>
   </include>
 
-  <node pkg="rosbag" type="play" name="player" output="screen" args="-d 5 -s 0 -r 0.4 $(arg rosbag_path)" required = "false"/>
+  <node pkg="rosbag" type="play" name="player" output="screen" args="-d 3 -s 5 -r 0.4 $(arg rosbag_path)" required = "false"/>
 
 </launch>
