@@ -1,7 +1,7 @@
 <launch>
 
-  <arg name="rosbag_name" default="bike_0_13_smb"/>
-  <arg name="rosbag_path" default="/media/oilter/D4561E4E561E31AA/SemesterProject/objectsFinal/$(arg rosbag_name).bag"/>
+  <arg name="rosbag_name" default="bike_bottle_person_52_smb"/>
+  <arg name="rosbag_path" default="/media/oilter/D4561E4E561E31AA/SemesterProject/2021-12-06/$(arg rosbag_name).bag"/>
 
   <arg name="camera_calib_path" default="$(find object_detection)/cfg/smb264_camera_model.yaml"/>
 

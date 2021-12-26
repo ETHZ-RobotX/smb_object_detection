@@ -33,6 +33,7 @@ class ObjectLocalizer:
             self.obj_conf           = self.config['objects']
             self.model_method       = self.config["model_method"].lower()
             self.ground_percentage  = self.config["ground_percentage"]
+            self.use_estimated_dist = self.config["self.use_estimated_dist"]
 
     def save_scene(self, objects_BB, points2D, points3D, image=None ):
         """
@@ -111,15 +112,15 @@ class ObjectLocalizer:
     def method_hdbscan_closeness(self,in_BB_3D, center_id, obj_class, estimated_dist = 0):
         
         cluster = DBSCAN(eps=self.obj_conf[obj_class]["eps"], min_samples=2).fit(in_BB_3D[:,[0,2]])
-       
         uniq = np.unique(cluster.labels_)
 
         min_val = 100000
         indices = None
 
-        
+        # indices = np.nonzero(in_BB_3D[:,1] > 0)[0]
+        # avg = [0,0,0]
+                
         for i in uniq:
-            
             if i == -1:
                 continue
 
@@ -147,7 +148,7 @@ class ObjectLocalizer:
         avg[:2] = center_point[:2]
          
         print("Estimated dist: ", estimated_dist, "Pose: ", avg[2])
-
+        
         return avg, indices
     
     def method_kMeans(self,in_BB_3D):
@@ -246,9 +247,10 @@ class ObjectLocalizer:
             on_object = np.arange(0,in_BB_3D.shape[0])
 
             # estimated_dist = 5.82383393 - 0.00956915 * self.object_unique_size(index, self.obj_conf[obj_class]['unique'])
-
-            p = np.poly1d([-5.54684160e-08,  9.16524366e-05, -5.14082476e-02,  1.13425403e+01])
-            estimated_dist = p(self.object_unique_size(index, self.obj_conf[obj_class]['unique']))
+            estimated_dist = 0
+            if self.use_estimated_dist:
+                p = np.poly1d([-1.33652937e-13,  4.55267531e-10, -5.76408389e-07,  3.45532171e-04, -1.03922962e-01,  1.50021037e+01])
+                estimated_dist = p(self.object_unique_size(index, self.obj_conf[obj_class]['unique']))
 
 
             if self.model_method == "hdbscan":

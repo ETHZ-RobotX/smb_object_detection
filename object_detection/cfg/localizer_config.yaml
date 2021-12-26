@@ -1,6 +1,8 @@
 model_method : hdbscan
-ground_percentage : 0.7
+ground_percentage : 0.65
+self.use_estimated_dist : True
 save_data : False
+
 
 objects:  
   person:
