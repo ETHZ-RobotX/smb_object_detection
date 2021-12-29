@@ -1,24 +1,23 @@
 model_method : hdbscan
-ground_percentage : 0.65
+ground_percentage : 0.6
 self.use_estimated_dist : True
-save_data : False
 
 
 objects:  
   person:
-    eps : 0.3
+    eps : 0.2
     contract_percentage_bottom : 10
     contract_percentage_top : 10
     contract_percentage_sides : 10 
-    max_depth : 0.3 
+    max_depth : 0.2
     unique : x
 
   bicycle:
-    eps : 0.3
+    eps : 0.5
     contract_percentage_bottom : 10
     contract_percentage_top : 10
     contract_percentage_sides : 10 
-    max_depth : 0.4
+    max_depth : 0.2
     unique : y
 
   car:

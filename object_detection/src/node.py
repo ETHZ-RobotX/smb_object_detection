@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+from posixpath import join
 import rospy
 import ros_numpy
 import numpy as np
@@ -7,14 +8,27 @@ from numpy.lib.recfunctions import unstructured_to_structured
 
 from cv_bridge import CvBridge
 from sensor_msgs.msg import Image, PointCloud2, CameraInfo
+import sensor_msgs.point_cloud2 as pc2
 from object_detection.msg import ObjectDetection, ObjectDetectionArray
 
 from object_detection.objectdetector import ObjectDetector
 from object_detection.pointprojector import PointProjector
 from object_detection.objectlocalizer import ObjectLocalizer
 
+from os.path import join
+
 import warnings
 warnings.filterwarnings("ignore")
+
+def pointcloud2_to_xyzi(pointcloud2):
+    pc_list = pc2.read_points_list(pointcloud2, skip_nans=True)
+    xyzi = np.zeros((len(pc_list),4))
+    for ind, p in enumerate(pc_list):
+        xyzi[ind,0] = p[0]
+        xyzi[ind,1] = p[1]
+        xyzi[ind,2] = p[2]
+        xyzi[ind,3] = p[3]
+    return xyzi
 
 
 UINT32 = 2**32 - 1
@@ -47,9 +61,12 @@ class Node:
         self.synchronizer                   = mf.ApproximateTimeSynchronizer([ self.camera_sub, self.lidar_sub], 
                                                                                self.camera_lidar_sync_queue_size,  
                                                                                self.camera_lidar_sync_slop)
+        
+        # ---------- Config Directory ----------
+        self.config_dir                     = rospy.get_param('~config_dir', None)
 
         # ---------- Point Projector Related ---------- 
-        self.reproject_cfg                  = rospy.get_param('~reproject_config', None)
+        self.project_cfg                  = rospy.get_param('~project_config', None)
 
         # ---------- 2D Object Detection Related ----------
         self.objectdetector_cfg             = rospy.get_param('~detector_config', None) 
@@ -58,13 +75,15 @@ class Node:
         # ---------- 3D Object Localizer Related ----------
         self.objectlocalizer_cfg            = rospy.get_param('~localizer_config', None)
         self.objectlocalizer_save_data      = rospy.get_param('~objectlocalizer_save_data', False)
-        self.objectlocalizer_data_dir       = rospy.get_param('~objectlocalizer_data_dir', False)
+        self.objectlocalizer_learning_type  = rospy.get_param('~objectlocalizer_learning_type', None)
 
         # ---------- Objects of Actions ----------
         self.imagereader                    = CvBridge()
-        self.pointprojector                 = PointProjector(self.reproject_cfg)
-        self.objectdetector                 = ObjectDetector(self.objectdetector_cfg)           
-        self.objectlocalizer                = ObjectLocalizer(self.objectlocalizer_cfg, self.objectlocalizer_data_dir, self.objectlocalizer_save_data)
+        self.pointprojector                 = PointProjector( join(self.config_dir, self.project_cfg))
+        self.objectdetector                 = ObjectDetector( join(self.config_dir, self.objectdetector_cfg))           
+        self.objectlocalizer                = ObjectLocalizer( join(self.config_dir, self.objectlocalizer_cfg) 
+                                                             , self.config_dir, self.objectlocalizer_save_data
+                                                             , self.objectlocalizer_learning_type)
         
         rospy.loginfo("Detector is set")
     
@@ -87,7 +106,10 @@ class Node:
             if image_msg.height > 0 and lidar_msg.width > 0:
                 
                 # Read lidar message
-                point_cloud_XYZ = ros_numpy.point_cloud2.pointcloud2_to_xyz_array(lidar_msg)
+                # point_cloud_XYZ = ros_numpy.point_cloud2.pointcloud2_to_xyz_array(lidar_msg)
+                # point_cloud_XYZ2 = pc2.read_points_list(lidar_msg)
+
+                point_cloud_XYZ = pointcloud2_to_xyzi(lidar_msg)
 
                 # Ground filter 
                 # Upward direction is Z which 3rd column in the matrix
@@ -95,8 +117,8 @@ class Node:
                 point_cloud_XYZ = self.objectlocalizer.filter_ground(point_cloud_XYZ, 2)
 
                 # translate and project PointCloud onto the Image  
-                point_cloud_XYZ = self.pointprojector.translatePoints(point_cloud_XYZ)
-                pointcloud_on_image , pointcloud_in_FoV = self.pointprojector.projectPointsOnImage(point_cloud_XYZ)
+                point_cloud_XYZ[:,:3] = self.pointprojector.translatePoints(point_cloud_XYZ[:,:3])
+                pointcloud_on_image , in_FoV_indices = self.pointprojector.projectPointsOnImage(point_cloud_XYZ[:,:3])
 
                 # transform the image msg to numpy array
                 cv_image = self.imagereader.imgmsg_to_cv2(image_msg, "bgr8")
@@ -107,13 +129,13 @@ class Node:
                 # Localize every detected object
                 object_poses_list, on_object_list = self.objectlocalizer.localize(object_detection_result, \
                                                                                   pointcloud_on_image, \
-                                                                                  pointcloud_in_FoV, \
+                                                                                  point_cloud_XYZ[in_FoV_indices], \
                                                                                   cv_image  )
 
                 # Convert arrays to correct format
                 pointcloud_on_image = np.c_[ pointcloud_on_image, np.zeros(pointcloud_on_image.shape[0]) ]
                 pointcloud_on_image = unstructured_to_structured( pointcloud_on_image, dtype = np.dtype( [('x', np.float32), ('y', np.float32), ('z', np.float32)] ))
-                pointcloud_in_FoV   = unstructured_to_structured( pointcloud_in_FoV, dtype = np.dtype( [('x', np.float32), ('y', np.float32), ('z', np.float32)] ))
+                pointcloud_in_FoV   = unstructured_to_structured( point_cloud_XYZ[in_FoV_indices], dtype = np.dtype( [('x', np.float32), ('y', np.float32), ('z', np.float32), ('i', np.float32)] ))
                 
                 # Create object detection message
                 object_detection_array = ObjectDetectionArray()
@@ -138,17 +160,15 @@ class Node:
                     object_detection.bounding_box_max_x = int(object_detection_result['xmax'][i])
                     object_detection.bounding_box_max_y = int(object_detection_result['ymax'][i])
 
-                    try:
-                        object_detection.on_object_point_indices = on_object_list[i] if len(np.atleast_1d(on_object_list[i]))>1 else [on_object_list[i]]
-                    except:
-                        continue
+                    object_detection.on_object_point_indices = list(on_object_list[i]) # if len(np.atleast_1d(on_object_list[i]))>1 else on_object_list[i]
 
                     object_detection.pose.x = object_poses_list[i][0]
                     object_detection.pose.y = object_poses_list[i][1]
                     object_detection.pose.z = object_poses_list[i][2]
                     
                     object_detection_array.detections.append(object_detection)
-
+            
+            # Publish the message
             self.object_detection_pub.publish(object_detection_array)
 
         self.camera_info_sub = rospy.Subscriber(self.camera_info_topic , CameraInfo, self.image_info_callback)

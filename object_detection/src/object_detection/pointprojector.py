@@ -83,8 +83,8 @@ class PointProjector:
         Args:
             points: nx3 matrix XYZ
         Returns:
-            points_on_image: pixel coordinates of projected points
-            points_in_FoV: 3D coordinates of projected points in camera frame
+            points_on_image      : pixel coordinates of projected points
+            points_in_FoV_indices: Indices of projected points in camera frame
         """
 
         points_on_image, indices = self.projectPoints(points)
@@ -97,7 +97,7 @@ class PointProjector:
         indices = indices[inside_frame_indices]
         points_on_image = points_on_image[inside_frame_indices,:]    
     
-        return points_on_image, points[indices]
+        return points_on_image, indices
 
 
 

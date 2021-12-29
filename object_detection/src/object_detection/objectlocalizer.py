@@ -1,11 +1,15 @@
+from math import dist
 import os
 import numpy as np
 from dataclasses import dataclass
 from scipy.signal import find_peaks
-from sklearn.cluster import DBSCAN
+from sklearn.cluster import DBSCAN, OPTICS
 import yaml
 
+import rospy
+
 NO_POSE = -1
+DATA = "data"
 
 @dataclass
 class BoundingBox:
@@ -23,10 +27,11 @@ class Object:
 
 
 class ObjectLocalizer:
-    def __init__(self, config, data_dir, data_save):
+    def __init__(self, config, config_dir, data_save, learner_type):
 
-        self.data_save = data_save
-        self.data_dir = data_dir
+        self.data_save          = False 
+        self.learner_type       = learner_type
+        self.data_dir           = os.path.join(config_dir, DATA)
 
         with open(config) as file:
             self.config             = yaml.load(file, Loader=yaml.FullLoader)
@@ -34,6 +39,19 @@ class ObjectLocalizer:
             self.model_method       = self.config["model_method"].lower()
             self.ground_percentage  = self.config["ground_percentage"]
             self.use_estimated_dist = self.config["self.use_estimated_dist"]
+
+        if self.learner_type is not None:
+            self.data_save          = data_save
+            self.learner_data_dir   = os.path.join(self.data_dir, self.learner_type)
+            self.create_save_directory()
+            
+            self.estimate_dist_cfg_dir  = os.path.join(config_dir, self.learner_type+".yaml" )
+
+            with open(self.estimate_dist_cfg_dir) as file:
+                self.estimate_dist_cfg  = yaml.load(file, Loader=yaml.FullLoader)
+
+        else:
+            rospy.loginfo("Learner type was not specified. Data will not be saved.")
 
     def save_scene(self, objects_BB, points2D, points3D, image=None ):
         """
@@ -116,9 +134,6 @@ class ObjectLocalizer:
 
         min_val = 100000
         indices = None
-
-        # indices = np.nonzero(in_BB_3D[:,1] > 0)[0]
-        # avg = [0,0,0]
                 
         for i in uniq:
             if i == -1:
@@ -131,24 +146,30 @@ class ObjectLocalizer:
                 indices = indices_
                 min_val = min_val_
 
+        if indices is None:
+            indices = np.array([NO_POSE])
+            avg     = np.array([0,0, NO_POSE])
         
-        distances = np.squeeze(in_BB_3D[indices,2])
-        in_range_indices = np.nonzero( ( distances - min(distances) ) < self.obj_conf[obj_class]["max_depth"] )[0]
+        else:
+            distances = np.squeeze(in_BB_3D[indices,2])
+            in_range_indices = np.nonzero( ( np.abs(distances - estimated_dist) - min( np.abs(distances - estimated_dist) ) ) < self.obj_conf[obj_class]["max_depth"] )[0]
 
-        indices = indices[in_range_indices]
-        weights = np.abs(distances[in_range_indices] - max(distances[in_range_indices])) # **2
+            indices = indices[in_range_indices]
 
-        if np.sum(weights) == 0:
-            weights = weights + 1
+            # dist_to_center = np.linalg.norm(in_BB_3D[center_id,:2] - in_BB_3D[indices,:2], axis=1)
 
-        avg =  np.ma.average(in_BB_3D[indices], axis=0, weights=weights)
-        
-        center_point = in_BB_3D[center_id]
-        center_point[:2] = center_point[:2] * (avg[2] / center_point[2])
-        avg[:2] = center_point[:2]
-         
-        print("Estimated dist: ", estimated_dist, "Pose: ", avg[2])
-        
+            weights= np.abs(distances[in_range_indices] - max(distances[in_range_indices])) # **2
+            # weights2 = np.abs(dist_to_center - max(dist_to_center)) # **2
+
+            if np.sum(weights) == 0:
+                weights = weights + 1
+
+            avg =  np.ma.average(in_BB_3D[indices], axis=0, weights=weights)
+            
+            center_point = in_BB_3D[center_id]
+            center_point[:2] = center_point[:2] * (avg[2] / center_point[2])
+            avg[:2] = center_point[:2]
+                 
         return avg, indices
     
     def method_kMeans(self,in_BB_3D):
@@ -238,7 +259,6 @@ class ObjectLocalizer:
         if center_ind == NO_POSE :
             on_object_ind = np.array([NO_POSE])
             pos           = np.array([0,0, NO_POSE])
-            center_ind = NO_POSE
 
         else:
             in_BB_3D = self.points3D[in_BB_indices, :]
@@ -246,10 +266,9 @@ class ObjectLocalizer:
 
             on_object = np.arange(0,in_BB_3D.shape[0])
 
-            # estimated_dist = 5.82383393 - 0.00956915 * self.object_unique_size(index, self.obj_conf[obj_class]['unique'])
             estimated_dist = 0
             if self.use_estimated_dist:
-                p = np.poly1d([-1.33652937e-13,  4.55267531e-10, -5.76408389e-07,  3.45532171e-04, -1.03922962e-01,  1.50021037e+01])
+                p = np.poly1d(self.estimate_dist_cfg[obj_class])
                 estimated_dist = p(self.object_unique_size(index, self.obj_conf[obj_class]['unique']))
 
 
@@ -294,18 +313,26 @@ class ObjectLocalizer:
             if on_object[0] == NO_POSE:
                 on_object_list.append(on_object)
             else:
-                on_object_list.append(np.array(np.squeeze(on_object), dtype=np.int32))
+                on_object_list.append(np.array(on_object, dtype=np.int32))
 
                 if self.data_save:
-                    self.save_data(ind, pos)
+                    if self.learner_type == "bb2dist":    
+                        self.save_data_bb2dist(ind, pos)
+                    else:
+                        self.save_data_bb2dist(ind, pos)
 
             object_poses.append(pos)
             
         return object_poses, on_object_list
 
+    def create_save_directory(self):
+        
+        if self.learner_type == "bb2dist":
+            if not os.path.exists( self.learner_data_dir):
+                os.makedirs(self.learner_data_dir)
                  
-    def save_data(self, ind, pose):
-
+    def save_data_bb2dist(self, ind, pose):
+        
         for i in range(len(self.objects_BB)): 
 
             if ind == i :
@@ -319,7 +346,7 @@ class ObjectLocalizer:
 
         txt = obj_class + ".txt"
         input = str(bb_size) + " " + str(pose[2]) + "\n"
-        with open( os.path.join( self.data_dir, txt ), 'a' ) as file:
+        with open( os.path.join( self.learner_data_dir, txt ), 'a' ) as file:
             file.write(input)
 
     def object_unique_size(self, ind, unique):
