@@ -7,38 +7,26 @@ from numpy.lib.recfunctions import unstructured_to_structured
 
 from cv_bridge import CvBridge
 from sensor_msgs.msg import Image, PointCloud2, CameraInfo
-import sensor_msgs.point_cloud2 as pc2
+
 from object_detection.msg import ObjectDetection, ObjectDetectionArray
 
-from object_detection.objectdetector import ObjectDetector
-from object_detection.pointprojector import PointProjector
-from object_detection.objectlocalizer import ObjectLocalizer
+from object_detection.objectdetector    import ObjectDetector
+from object_detection.pointprojector    import PointProjector
+from object_detection.objectlocalizer   import ObjectLocalizer
+from object_detection.utils             import pointcloud2_to_xyzi
 
 from os.path import join
 
 import warnings
 warnings.filterwarnings("ignore")
 
-def pointcloud2_to_xyzi(pointcloud2):
-    pc_list = pc2.read_points_list(pointcloud2, skip_nans=True)
-    xyzi = np.zeros((len(pc_list),4))
-    for ind, p in enumerate(pc_list):
-        xyzi[ind,0] = p[0]
-        xyzi[ind,1] = p[1]
-        xyzi[ind,2] = p[2]
-        xyzi[ind,3] = p[3]
-    return xyzi
-
 
 UINT32 = 2**32 - 1
-
-# TODO: Add warnings such as "No self.optical_frame"
 
 class Node:
     def __init__(self):
         # Initilized the node 
         rospy.init_node("objectify", anonymous=True)
-
 
         # ---------- Node Related Params Starts ---------- 
         # -> Subscribed Topics
@@ -69,21 +57,31 @@ class Node:
         self.project_cfg                  = rospy.get_param('~project_config', None)
 
         # ---------- 2D Object Detection Related ----------
-        self.objectdetector_cfg             = rospy.get_param('~detector_config', None) 
-        self.multiple_instance              = rospy.get_param('~multiple_instance', False)
+        self.objectdetector_cfg = {
+            "architecture"      :  rospy.get_param('~architecture', 'yolo'),
+            "model"             :  rospy.get_param('~model', 'yolov5n6'),
+            "device"            :  rospy.get_param('~device', 'cpu'),
+            "confident"         :  rospy.get_param('~confident', '0.4'),
+            "iou"               :  rospy.get_param('~iou', '0.1'),
+            "checkpoint"        :  rospy.get_param('~checkpoint', None),
+            "classes"           :  rospy.get_param('~classes', [0, 1]),
+            "multiple_instance" :  rospy.get_param('~multiple_instance', False)
+        }
 
         # ---------- 3D Object Localizer Related ----------
-        self.objectlocalizer_cfg            = rospy.get_param('~localizer_config', None)
-        self.objectlocalizer_save_data      = rospy.get_param('~objectlocalizer_save_data', False)
-        self.objectlocalizer_learning_type  = rospy.get_param('~objectlocalizer_learning_type', None)
+        self.objectlocalizer_cfg = {
+            "model_method"                  :  rospy.get_param('~model_method', 'hdbscan'),
+            "ground_percentage"             :  rospy.get_param('~ground_percentage', '0.6'),
+            "distance_estimater_type"       :  rospy.get_param('~distance_estimater_type', 'bb2dist'),
+            "distance_estimater_save_data"  :  rospy.get_param('~distance_estimater_save_data', 'False'),
+            "object_specific_file"          :  rospy.get_param('~object_specific_file', 'object_specific.yaml')
+        }
 
         # ---------- Objects of Actions ----------
         self.imagereader                    = CvBridge()
         self.pointprojector                 = PointProjector( join(self.config_dir, self.project_cfg))
-        self.objectdetector                 = ObjectDetector( join(self.config_dir, self.objectdetector_cfg))           
-        self.objectlocalizer                = ObjectLocalizer( join(self.config_dir, self.objectlocalizer_cfg) 
-                                                             , self.config_dir, self.objectlocalizer_save_data
-                                                             , self.objectlocalizer_learning_type)
+        self.objectdetector                 = ObjectDetector( self.objectdetector_cfg )           
+        self.objectlocalizer                = ObjectLocalizer( self.objectlocalizer_cfg, self.config_dir )
         
         rospy.loginfo("Detector is set")
     
@@ -124,7 +122,7 @@ class Node:
                 cv_image = self.imagereader.imgmsg_to_cv2(image_msg, "bgr8")
 
                 # Detect objects in image
-                object_detection_result, object_detection_image = self.objectdetector.detect(cv_image, multiple_instance = self.multiple_instance)
+                object_detection_result, object_detection_image = self.objectdetector.detect(cv_image)
                 
                 # Localize every detected object
                 object_poses_list, on_object_list = self.objectlocalizer.localize(object_detection_result, \
