@@ -44,17 +44,24 @@
     <param name="config_dir" value='$(find object_detection)/cfg/'/>
 
     <!--Point Projector related-->
-    <param name="project_config" value='projector_config.yaml'/>
+    <param name="project_config" value='projector_config_SMB264.yaml'/>
 
     <!--Object detection related-->
+    <param name="architecture" value='yolo'/>
+    <param name="model" value='yolov5m6'/>
+    <param name="device" value='cpu'/>
+    <param name="confident" value='0.4'/>
+    <param name="iou" value='0.1'/>
+    <arg name="classes" default="[0, 1]"/>
+    <rosparam param="classes" subst_value="True">$(arg classes)</rosparam>
     <param name="multiple_instance" value='False'/>
-    <param name="detector_config" value='detector_config.yaml'/>
 
     <!--Object localization related-->
-    <param name="localizer_config" value='localizer_config.yaml'/>
+    <param name="model_method" value='hdbscan'/>
+    <param name="ground_percentage" value='0.6'/>
+    <param name="use_estimated_dist" value='True'/>
     <param name="objectlocalizer_save_data" value='False'/>
     <param name="objectlocalizer_learning_type" value='bb2dist'/>
-
 
   </node>
 

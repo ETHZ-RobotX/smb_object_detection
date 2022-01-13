@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-from posixpath import join
 import rospy
 import ros_numpy
 import numpy as np
@@ -39,6 +38,7 @@ class Node:
     def __init__(self):
         # Initilized the node 
         rospy.init_node("objectify", anonymous=True)
+
 
         # ---------- Node Related Params Starts ---------- 
         # -> Subscribed Topics
@@ -145,7 +145,7 @@ class Node:
                 object_detection_array.detections_image        = self.imagereader.cv2_to_imgmsg(object_detection_image, 'bgr8')
                 object_detection_array.pointcloud_in_frame_2D  = ros_numpy.point_cloud2.array_to_pointcloud2(pointcloud_on_image) 
                 object_detection_array.pointcloud_in_frame_3D  = ros_numpy.point_cloud2.array_to_pointcloud2(pointcloud_in_FoV) 
-                
+
                 self.seq = self.seq + 1 if self.seq < UINT32-1 else 0
 
                 # For every detected image object

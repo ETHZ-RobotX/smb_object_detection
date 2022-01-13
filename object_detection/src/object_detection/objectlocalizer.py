@@ -5,26 +5,12 @@ from dataclasses import dataclass
 from scipy.signal import find_peaks
 from sklearn.cluster import DBSCAN, OPTICS
 import yaml
+import hdbscan
 
 import rospy
 
 NO_POSE = -1
 DATA = "data"
-
-@dataclass
-class BoundingBox:
-    min_x : int
-    min_y : int
-    max_x : int
-    max_y : int
-
-@dataclass
-class Object:
-    object_class  : str
-    in_BB_indices : np.array
-    in_BB_center_index : int
-    BB : BoundingBox
-
 
 class ObjectLocalizer:
     def __init__(self, config, config_dir, data_save, learner_type):
@@ -129,7 +115,8 @@ class ObjectLocalizer:
 
     def method_hdbscan_closeness(self,in_BB_3D, center_id, obj_class, estimated_dist = 0):
         
-        cluster = DBSCAN(eps=self.obj_conf[obj_class]["eps"], min_samples=2).fit(in_BB_3D[:,[0,2]])
+        cluster = DBSCAN(eps=self.obj_conf[obj_class]["eps"], min_samples=2).fit(in_BB_3D[:,[0,1,2]])
+               
         uniq = np.unique(cluster.labels_)
 
         min_val = 100000
@@ -150,16 +137,65 @@ class ObjectLocalizer:
             indices = np.array([NO_POSE])
             avg     = np.array([0,0, NO_POSE])
         
-        else:
+        else:          
+            
             distances = np.squeeze(in_BB_3D[indices,2])
             in_range_indices = np.nonzero( ( np.abs(distances - estimated_dist) - min( np.abs(distances - estimated_dist) ) ) < self.obj_conf[obj_class]["max_depth"] )[0]
 
             indices = indices[in_range_indices]
 
-            # dist_to_center = np.linalg.norm(in_BB_3D[center_id,:2] - in_BB_3D[indices,:2], axis=1)
+            weights= np.abs(distances[in_range_indices] - max(distances[in_range_indices])) # **2
+
+
+            if np.sum(weights) == 0:
+                weights = weights + 1
+
+            avg =  np.ma.average(in_BB_3D[indices], axis=0, weights=weights)
+            
+            center_point = in_BB_3D[center_id]
+            center_point[:2] = center_point[:2] * (avg[2] / center_point[2])
+            avg[:2] = center_point[:2]
+                 
+        return avg, indices
+    
+    def method_hdbscan_widht(self,in_BB_3D, center_id, obj_class, estimated_dist = 0):
+        
+        #cluster = DBSCAN(eps=self.obj_conf[obj_class]["eps"], min_samples=2).fit(in_BB_3D[:,[0,1,2]])
+        cluster = hdbscan.HDBSCAN(min_cluster_size=2)
+        cluster.fit(in_BB_3D[:,[0,1,2]])
+        uniq = np.unique(cluster.labels_)
+
+        min_val = 100000
+        max_width = 0
+        indices = None
+        
+                
+        for i in uniq:
+            if i == -1:
+                continue
+
+            indices_ = np.nonzero(cluster.labels_ == i)[0]
+            min_val_ = np.abs( estimated_dist - np.mean(in_BB_3D[indices_,2]) )
+            max_width_ = np.abs( max(in_BB_3D[indices_,0]) - min(in_BB_3D[indices_,0]) )
+
+            if min_val_ < 1.5 and max_width_ > max_width :
+                max_width = max_width_
+                indices = indices_
+                #min_val = min_val_
+
+        if indices is None:
+            indices = np.array([NO_POSE])
+            avg     = np.array([0,0, NO_POSE])
+        
+        else:          
+            
+            distances = np.squeeze(in_BB_3D[indices,2])
+            in_range_indices = np.nonzero( ( np.abs(distances - estimated_dist) - min( np.abs(distances - estimated_dist) ) ) < self.obj_conf[obj_class]["max_depth"] )[0]
+
+            indices = indices[in_range_indices]
 
             weights= np.abs(distances[in_range_indices] - max(distances[in_range_indices])) # **2
-            # weights2 = np.abs(dist_to_center - max(dist_to_center)) # **2
+
 
             if np.sum(weights) == 0:
                 weights = weights + 1
@@ -193,27 +229,7 @@ class ObjectLocalizer:
         else:
             return in_BB_3D[indices], indices
 
-    def method_hdbscan(self,in_BB_3D):
-       
-        cluster = DBSCAN(eps=0.3, min_samples=1).fit(in_BB_3D)
-        uniq = np.unique(cluster.labels_)
 
-        min_val = 100000
-        indices = None
-
-        for i in uniq:
-            indices_ = np.squeeze(np.argwhere(cluster.labels_ == i))
-            min_val_ = np.mean(np.linalg.norm(in_BB_3D[indices_], axis=1))
-
-            if min_val_ < min_val:
-                indices = indices_
-                min_val = min_val_
-
-        if len(indices) > 1:
-            return np.mean(in_BB_3D[indices],axis=0), indices
-        else:
-            return in_BB_3D[indices], indices
-      
     def method_histogram(self,in_BB_3D, method = "distance", bins=100):
 
         if method == "distance":
@@ -273,7 +289,7 @@ class ObjectLocalizer:
 
 
             if self.model_method == "hdbscan":
-                pos, on_object = self.method_hdbscan_closeness(in_BB_3D, center_ind, obj_class, estimated_dist)
+                pos, on_object = self.method_hdbscan_widht(in_BB_3D, center_ind, obj_class, estimated_dist)
             elif self.model_method == "mean":
                 pos = np.mean(in_BB_3D, axis=0)
             elif self.model_method == "median":

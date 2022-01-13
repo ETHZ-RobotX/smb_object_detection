@@ -11,7 +11,6 @@ DATA_DIR    = os.path.join(CFG_DIR,"data")
 def bb2dist(degree = 5):
 
     bb2dist_dict = {}
-
     data_dir = os.path.join(DATA_DIR, "bb2dist")
 
     for filename in os.listdir(data_dir):
@@ -21,10 +20,6 @@ def bb2dist(degree = 5):
 
     with open(os.path.join(CFG_DIR,"bb2dist.yaml"), 'w') as file:
         yaml.dump(bb2dist_dict, file)
-
-    # with open(os.path.join(CFG_DIR,"bb2dist.yaml")) as file:
-    #     documents = yaml.full_load(file)
-    #     print(documents['bicycle'])
 
 if __name__=='__main__':
 

@@ -98,5 +98,5 @@ class ObjectDetector:
             # TODO: implement a function to transform output to the panda frame
             # output = self.transform2pandaframe(output)
 
-            return [outputs, out.get_image()[:, :, ::-1] ]
+            return outputs, out.get_image()[:, :, ::-1] 
 

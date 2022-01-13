@@ -1,0 +1,58 @@
+detector_confıg :
+  architecture  : "yolo"
+  model         : "yolov5m6"
+  checkpoint    : null
+  device        : "cpu"
+  confident     : 0.4
+  iou           : 0.1
+  classes       : [0, 1] # [0, 1, 25, 74]
+
+
+localizer_config:
+  method: "hdbscan"
+  ground_ratio: 0.6
+  
+  contract_percentage_bottom : 10
+  contract_percentage_top : 10
+  contract_percentage_sides : 10 
+
+  use_estimated_dist: True
+
+  objects:
+    person:
+      max_depth : 0.2
+      unique : "x"
+    
+    bicycle:
+      max_depth : 0.2
+      unique : "y"
+
+    car:
+      max_depth : 1.5  
+      unique : "xy"
+
+    clock:
+      max_depth : 0.3
+      unique : "xy"
+
+    bottle:
+      max_depth : 0.3
+      unique : "xy"
+
+    umbrella:
+      max_depth : 0.4
+      unique : "xy"
+
+
+projector_config:
+  R_camera_lidar :
+  - [-1.0, 0.0, 0.0]
+  - [ 0.0, 0.0,-1.0]
+  - [ 0.0,-1.0, 0.0]
+
+  R_correction   :
+    - [  0.9996186,  0.0179980, -0.0209424]
+    - [-0.0180019,  0.9998379, -0.0000000]
+    - [ 0.0209390,  0.0003770,  0.9997807]
+    
+  t_camera_lidar : [-0.045, -0.293, -0.241]
