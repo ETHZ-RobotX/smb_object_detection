@@ -13,16 +13,15 @@ from rospy.exceptions import ROSInitException
 class ObjectDetector:
     def __init__(self, config):
 
-        with open(config) as file:
-            self.config = yaml.load(file, Loader=yaml.FullLoader)
-            self.architecture   = self.config["architecture"]
-            self.model          = self.config["model"]
-            self.checkpoint     = self.config["checkpoint"]
-            self.device         = self.config["device"]
-            self.confident      = self.config["confident"]
-            self.iou            = self.config["iou"]
-            self.classes        = self.config["classes"]
-            self.detector       = None
+        self.architecture       = config["architecture"]
+        self.model              = config["model"]
+        self.checkpoint         = config["checkpoint"]
+        self.device             = config["device"]
+        self.confident          = config["confident"]
+        self.iou                = config["iou"]
+        self.classes            = config["classes"]
+        self.multiple_instance  = config["multiple_instance"]
+        self.detector           = None
 
         if self.architecture == 'yolo':
             self.detector = torch.hub.load('ultralytics/yolov5', self.model , device=self.device) # 'yolov5n'
@@ -70,7 +69,7 @@ class ObjectDetector:
 
         return detection
 
-    def detect(self, image, multiple_instance = False):
+    def detect(self, image):
         """ Detects objects on the given image using set model (YOLO V5 or Detectron) 
         Args:
             image             : numpy matrix, RGB or Gray Scale image
@@ -86,7 +85,7 @@ class ObjectDetector:
             output = self.detector(image)
             detection = output.pandas().xyxy[0]
 
-            if not multiple_instance:
+            if not self.multiple_instance:
                 detection = self.filter_detection(detection)
             return detection, output.render()[0]
 

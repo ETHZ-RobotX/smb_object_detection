@@ -1,7 +1,7 @@
 <launch>
 
-  <arg name="rosbag_name" default="bike_bottle_person_52_smb"/>
-  <arg name="rosbag_path" default="/media/oilter/D4561E4E561E31AA/SemesterProject/2021-12-06/$(arg rosbag_name).bag"/>
+  <arg name="rosbag_name" default="bike_0_13_smb"/>
+  <arg name="rosbag_path" default="/media/oilter/D4561E4E561E31AA/SemesterProject/objectsFinal/$(arg rosbag_name).bag"/>
 
   <arg name="camera_calib_path" default="$(find object_detection)/cfg/smb264_camera_model.yaml"/>
 
@@ -9,9 +9,11 @@
   <arg name="input_camera_name" default="/versavis/cam0" />
   <arg name="lidar_topic" default='/rslidar_points'/>
 
+  <arg name="object_detection_classes" default="[0, 1]"/>
+
   <!--Debayer the image-->
   <node pkg="image_proc" type="image_proc" name="debayer" ns="$(arg input_camera_name)/" />
-
+  
   <!--Undistored the debayered image-->
   <!--https://github.com/ethz-asl/image_undistort-->
   <node name="image_undistort_node" pkg="image_undistort" type="image_undistort_node" output="screen" clear_params="true">
@@ -48,20 +50,18 @@
 
     <!--Object detection related-->
     <param name="architecture" value='yolo'/>
-    <param name="model" value='yolov5m6'/>
+    <param name="model" value='yolov5n6'/>
     <param name="device" value='cpu'/>
     <param name="confident" value='0.4'/>
     <param name="iou" value='0.1'/>
-    <arg name="classes" default="[0, 1]"/>
-    <rosparam param="classes" subst_value="True">$(arg classes)</rosparam>
+    <rosparam param="classes" subst_value="True">$(arg object_detection_classes)</rosparam>
     <param name="multiple_instance" value='False'/>
 
     <!--Object localization related-->
     <param name="model_method" value='hdbscan'/>
     <param name="ground_percentage" value='0.6'/>
-    <param name="use_estimated_dist" value='True'/>
-    <param name="objectlocalizer_save_data" value='False'/>
-    <param name="objectlocalizer_learning_type" value='bb2dist'/>
+    <param name="distance_estimater_type" value='bb2dist'/>
+    <param name="distance_estimater_save_data" value='False'/>
 
   </node>
 

@@ -11,12 +11,13 @@ class PointProjector:
             R_camera_lidar      = self.config["R_camera_lidar"]
             R_correction        = self.config["R_correction"]
             t_camera_lidar      = self.config["t_camera_lidar"]
+            t_correction        = self.config["t_correction"]
 
         R_camera_lidar = np.float64(R_camera_lidar)
         R_correction = np.float64(R_correction)
 
         R_camera_lidar = np.matmul(R_camera_lidar,R_correction)       
-        t_camera_lidar = np.float64(t_camera_lidar)
+        t_camera_lidar = np.float64(t_camera_lidar) + np.float64(t_correction)
 
         self.set_transformationparams(R_camera_lidar,t_camera_lidar)
         self.K      = None  

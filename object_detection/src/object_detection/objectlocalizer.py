@@ -13,25 +13,24 @@ NO_POSE = -1
 DATA = "data"
 
 class ObjectLocalizer:
-    def __init__(self, config, config_dir, data_save, learner_type):
+    def __init__(self, config, config_dir):
 
-        self.data_save          = False 
-        self.learner_type       = learner_type
-        self.data_dir           = os.path.join(config_dir, DATA)
+        self.data_dir                   = os.path.join(config_dir, DATA)
+        self.object_specific_file_dir   = os.path.join(config_dir, config["object_specific_file"])
+        
+        with open(self.object_specific_file_dir) as file:
+            self.obj_conf               = yaml.load(file, Loader=yaml.FullLoader)
 
-        with open(config) as file:
-            self.config             = yaml.load(file, Loader=yaml.FullLoader)
-            self.obj_conf           = self.config['objects']
-            self.model_method       = self.config["model_method"].lower()
-            self.ground_percentage  = self.config["ground_percentage"]
-            self.use_estimated_dist = self.config["self.use_estimated_dist"]
+        self.model_method                   = config["model_method"].lower()
+        self.ground_percentage              = config["ground_percentage"]
+        self.distance_estimater_type        = config["distance_estimater_type"]
+        self.distance_estimater_save_data   = config["distance_estimater_save_data"]
 
-        if self.learner_type is not None:
-            self.data_save          = data_save
-            self.learner_data_dir   = os.path.join(self.data_dir, self.learner_type)
+        if self.distance_estimater_type  is not None:
+            self.learner_data_dir   = os.path.join(self.data_dir, self.distance_estimater_type)
             self.create_save_directory()
             
-            self.estimate_dist_cfg_dir  = os.path.join(config_dir, self.learner_type+".yaml" )
+            self.estimate_dist_cfg_dir  = os.path.join(config_dir, self.distance_estimater_type + ".yaml" )
 
             with open(self.estimate_dist_cfg_dir) as file:
                 self.estimate_dist_cfg  = yaml.load(file, Loader=yaml.FullLoader)
@@ -79,7 +78,7 @@ class ObjectLocalizer:
         return point3D[indices]
                
 
-    def points_in_BB(self, index, contract_percentage_bottom=10, contract_percentage_top=10, contract_percentage_sides=10 ):
+    def points_in_BB(self, index, contract_percentage_bottom=0, contract_percentage_top=0, contract_percentage_sides=0 ):
         """
         Args:
             index                   : index of the detected object in Pandas data frame
@@ -162,7 +161,7 @@ class ObjectLocalizer:
         
         #cluster = DBSCAN(eps=self.obj_conf[obj_class]["eps"], min_samples=2).fit(in_BB_3D[:,[0,1,2]])
         cluster = hdbscan.HDBSCAN(min_cluster_size=2)
-        cluster.fit(in_BB_3D[:,[0,1,2]])
+        cluster.fit(in_BB_3D[:,[0,2]])
         uniq = np.unique(cluster.labels_)
 
         min_val = 100000
@@ -266,10 +265,7 @@ class ObjectLocalizer:
         """
         obj_class = self.objects_BB["name"][index]
 
-        in_BB_indices, center_ind, center = self.points_in_BB(index, \
-                                            contract_percentage_bottom = self.obj_conf[obj_class]['contract_percentage_bottom'], \
-                                            contract_percentage_top    = self.obj_conf[obj_class]['contract_percentage_top'], \
-                                            contract_percentage_sides  = self.obj_conf[obj_class]['contract_percentage_sides'])
+        in_BB_indices, center_ind, center = self.points_in_BB(index)
 
         # If no points falls inside the BB
         if center_ind == NO_POSE :
@@ -283,7 +279,7 @@ class ObjectLocalizer:
             on_object = np.arange(0,in_BB_3D.shape[0])
 
             estimated_dist = 0
-            if self.use_estimated_dist:
+            if self.distance_estimater_type is not None:
                 p = np.poly1d(self.estimate_dist_cfg[obj_class])
                 estimated_dist = p(self.object_unique_size(index, self.obj_conf[obj_class]['unique']))
 
@@ -331,8 +327,8 @@ class ObjectLocalizer:
             else:
                 on_object_list.append(np.array(on_object, dtype=np.int32))
 
-                if self.data_save:
-                    if self.learner_type == "bb2dist":    
+                if self.distance_estimater_save_data :
+                    if self.distance_estimater_type== "bb2dist":    
                         self.save_data_bb2dist(ind, pos)
                     else:
                         self.save_data_bb2dist(ind, pos)
@@ -343,7 +339,7 @@ class ObjectLocalizer:
 
     def create_save_directory(self):
         
-        if self.learner_type == "bb2dist":
+        if self.distance_estimater_type== "bb2dist":
             if not os.path.exists( self.learner_data_dir):
                 os.makedirs(self.learner_data_dir)
                  
