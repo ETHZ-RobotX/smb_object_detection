@@ -21,10 +21,14 @@ import warnings
 warnings.filterwarnings("ignore")
 
 
-UINT32 = 2**32 - 1
+UINT32      = 2**32 - 1
+Z_UPWARDS   = 2
 
 class Node:
     def __init__(self):
+        
+        rospy.loginfo("Object Detector initilization starts ...")
+
         # Initilized the node 
         rospy.init_node("objectify", anonymous=True)
 
@@ -83,7 +87,8 @@ class Node:
         self.objectdetector                 = ObjectDetector( self.objectdetector_cfg )           
         self.objectlocalizer                = ObjectLocalizer( self.objectlocalizer_cfg, self.config_dir )
         
-        rospy.loginfo("Detector is set")
+        rospy.loginfo("Object Detector initilization done ...")
+        rospy.loginfo("Waiting for image info ...")
     
 
     def image_info_callback(self, camera_info):
@@ -93,9 +98,19 @@ class Node:
         K                      = np.array(camera_info.K, dtype=np.float64).reshape(3,3)
 
         self.pointprojector.set_cameraparams(K, [w,h])
+        self.seq += 1
 
         if self.pointprojector.K is not None:
+            rospy.loginfo("Image info is set! Detection is starting in 1 sec!")
+            rospy.sleep(1)
+            self.seq = 0
             self.camera_info_sub.unregister()
+        else:
+            if self.seq > 10:
+                rospy.logerr("Image info could not be set after 10th try! Please check image info!")
+                rospy.signal_shutdown("Image info missing!")
+            rospy.loginfo("Image info is not set! Trying again after 1 sec!")
+            rospy.sleep(1)
 
     def run(self):
 
@@ -104,15 +119,12 @@ class Node:
             if image_msg.height > 0 and lidar_msg.width > 0:
                 
                 # Read lidar message
-                # point_cloud_XYZ = ros_numpy.point_cloud2.pointcloud2_to_xyz_array(lidar_msg)
-                # point_cloud_XYZ2 = pc2.read_points_list(lidar_msg)
-
                 point_cloud_XYZ = pointcloud2_to_xyzi(lidar_msg)
 
                 # Ground filter 
                 # Upward direction is Z which 3rd column in the matrix
                 # It is positive because it increases upwards
-                point_cloud_XYZ = self.objectlocalizer.filter_ground(point_cloud_XYZ, 2)
+                point_cloud_XYZ = self.objectlocalizer.filter_ground(point_cloud_XYZ, Z_UPWARDS)
 
                 # translate and project PointCloud onto the Image  
                 point_cloud_XYZ[:,:3] = self.pointprojector.translatePoints(point_cloud_XYZ[:,:3])
@@ -170,7 +182,8 @@ class Node:
             self.object_detection_pub.publish(object_detection_array)
 
         self.camera_info_sub = rospy.Subscriber(self.camera_info_topic , CameraInfo, self.image_info_callback)
-        self.synchronizer.registerCallback(callback)
+        if self.pointprojector.K is not None: 
+            self.synchronizer.registerCallback(callback)
 
         rospy.spin()
 
