@@ -23,10 +23,11 @@ class ObjectLocalizer:
 
         self.model_method                   = config["model_method"].lower()
         self.ground_percentage              = config["ground_percentage"]
-        self.distance_estimater_type        = config["distance_estimater_type"]
+        self.distance_estimater_type        = config["distance_estimater_type"].lower()
         self.distance_estimater_save_data   = config["distance_estimater_save_data"]
-
-        if self.distance_estimater_type  is not None:
+        print("asd --------------------",self.distance_estimater_type)
+        
+        if self.distance_estimater_type  != "none":
             self.learner_data_dir   = os.path.join(self.data_dir, self.distance_estimater_type)
             self.create_save_directory()
             
@@ -114,8 +115,7 @@ class ObjectLocalizer:
 
     def method_hdbscan_closeness(self,in_BB_3D, center_id, obj_class, estimated_dist = 0):
         
-        cluster = DBSCAN(eps=self.obj_conf[obj_class]["eps"], min_samples=2).fit(in_BB_3D[:,[0,1,2]])
-               
+        cluster = hdbscan.HDBSCAN(min_cluster_size=2, cluster_selection_epsilon=0.05).fit(in_BB_3D[:,[0,2]])
         uniq = np.unique(cluster.labels_)
 
         min_val = 100000
@@ -279,13 +279,13 @@ class ObjectLocalizer:
             on_object = np.arange(0,in_BB_3D.shape[0])
 
             estimated_dist = 0
-            if self.distance_estimater_type is not None:
+            if self.distance_estimater_type != "none":
                 p = np.poly1d(self.estimate_dist_cfg[obj_class])
                 estimated_dist = p(self.object_unique_size(index, self.obj_conf[obj_class]['unique']))
 
 
             if self.model_method == "hdbscan":
-                pos, on_object = self.method_hdbscan_widht(in_BB_3D, center_ind, obj_class, estimated_dist)
+                pos, on_object = self.method_hdbscan_closeness(in_BB_3D, center_ind, obj_class, estimated_dist)
             elif self.model_method == "mean":
                 pos = np.mean(in_BB_3D, axis=0)
             elif self.model_method == "median":
