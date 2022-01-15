@@ -1,7 +1,9 @@
 import yaml
-
+import rospy
 from PIL.Image import FASTOCTREE
 import numpy as np
+
+from object_detection.utils import check_validity_lidar2camera_transformation
 
 class PointProjector:
     def __init__(self, config):
@@ -12,6 +14,11 @@ class PointProjector:
             R_correction        = self.config["R_correction"]
             t_camera_lidar      = self.config["t_camera_lidar"]
             t_correction        = self.config["t_correction"]
+        
+        if not check_validity_lidar2camera_transformation(R_camera_lidar, t_camera_lidar):
+            msg = "Lidar to Camera transformation matrices are not correctly configured. Please check the file %s" %config
+            rospy.logerr(msg)
+            rospy.signal_shutdown("Lidar to Camera transformation matrices are not correctly configured!")
 
         R_camera_lidar = np.float64(R_camera_lidar)
         R_correction = np.float64(R_correction)

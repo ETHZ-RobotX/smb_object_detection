@@ -25,7 +25,6 @@ class ObjectLocalizer:
         self.ground_percentage              = config["ground_percentage"]
         self.distance_estimater_type        = config["distance_estimater_type"].lower()
         self.distance_estimater_save_data   = config["distance_estimater_save_data"]
-        print("asd --------------------",self.distance_estimater_type)
         
         if self.distance_estimater_type  != "none":
             self.learner_data_dir   = os.path.join(self.data_dir, self.distance_estimater_type)
@@ -51,16 +50,7 @@ class ObjectLocalizer:
         self.points2D   = points2D
         self.image      = image
     
-    def get_front(self, object0, object1):
-        only_in_0 = np.setxor1d(object0.in_BB_indices, object1.in_BB_indices)
-        only_in_1 = np.setxor1d(object1.in_BB_indices, object0.in_BB_indices)
-
-        if len(only_in_0) == 0:
-            return 0
-
-        if len(only_in_1) == 0:
-            return 1 
-
+    
     def filter_ground(self, point3D, upward):
         """
         Args:

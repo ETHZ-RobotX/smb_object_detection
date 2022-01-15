@@ -13,7 +13,7 @@ from object_detection.msg import ObjectDetection, ObjectDetectionArray
 from object_detection.objectdetector    import ObjectDetector
 from object_detection.pointprojector    import PointProjector
 from object_detection.objectlocalizer   import ObjectLocalizer
-from object_detection.utils             import pointcloud2_to_xyzi
+from object_detection.utils             import pointcloud2_to_xyzi, check_validity_image_info
 
 from os.path import join
 
@@ -31,8 +31,12 @@ class Node:
 
         # Initilized the node 
         rospy.init_node("objectify", anonymous=True)
+        self.verbose                        = rospy.get_param('~verbose', True)
 
-        # ---------- Node Related Params Starts ---------- 
+        # Flags to start object detection
+        self.image_info_recieved            = False
+
+        # ---------- Node Related Params ---------- 
         # -> Subscribed Topics
         self.camera_topic                   = rospy.get_param('~camera_topic', '/versavis/cam0/undistorted')
         self.camera_info_topic              = rospy.get_param('~camera_info_topic', '/versavis/cam0/camera_info')
@@ -87,7 +91,7 @@ class Node:
         self.objectdetector                 = ObjectDetector( self.objectdetector_cfg )           
         self.objectlocalizer                = ObjectLocalizer( self.objectlocalizer_cfg, self.config_dir )
         
-        rospy.loginfo("Object Detector initilization done ...")
+        rospy.loginfo("Object Detector initilization done.")
         rospy.loginfo("Waiting for image info ...")
     
 
@@ -96,14 +100,14 @@ class Node:
         h                      = camera_info.height
         w                      = camera_info.width
         K                      = np.array(camera_info.K, dtype=np.float64).reshape(3,3)
-
-        self.pointprojector.set_cameraparams(K, [w,h])
         self.seq += 1
 
-        if self.pointprojector.K is not None:
+        if check_validity_image_info(K, w, h):
+            self.pointprojector.set_cameraparams(K, [w,h])
             rospy.loginfo("Image info is set! Detection is starting in 1 sec!")
             rospy.sleep(1)
             self.seq = 0
+            self.image_info_recieved = True
             self.camera_info_sub.unregister()
         else:
             if self.seq > 10:
@@ -116,7 +120,7 @@ class Node:
 
         def callback(image_msg, lidar_msg):
             # If Image and Lidar messages are not empty 
-            if image_msg.height > 0 and lidar_msg.width > 0:
+            if self.image_info_recieved and image_msg.height > 0 and lidar_msg.width > 0:
                 
                 # Read lidar message
                 point_cloud_XYZ = pointcloud2_to_xyzi(lidar_msg)
@@ -141,21 +145,12 @@ class Node:
                                                                                   pointcloud_on_image, \
                                                                                   point_cloud_XYZ[in_FoV_indices], \
                                                                                   cv_image  )
-
-                # Convert arrays to correct format
-                pointcloud_on_image = np.c_[ pointcloud_on_image, np.zeros(pointcloud_on_image.shape[0]) ]
-                pointcloud_on_image = unstructured_to_structured( pointcloud_on_image, dtype = np.dtype( [('x', np.float32), ('y', np.float32), ('z', np.float32)] ))
-                pointcloud_in_FoV   = unstructured_to_structured( point_cloud_XYZ[in_FoV_indices], dtype = np.dtype( [('x', np.float32), ('y', np.float32), ('z', np.float32), ('i', np.float32)] ))
-                
+ 
                 # Create object detection message
                 object_detection_array = ObjectDetectionArray()
                 object_detection_array.header.stamp            = image_msg.header.stamp
                 object_detection_array.header.frame_id         = self.optical_frame_id
                 object_detection_array.header.seq              = self.seq
-                object_detection_array.detections_image        = self.imagereader.cv2_to_imgmsg(object_detection_image, 'bgr8')
-                object_detection_array.pointcloud_in_frame_2D  = ros_numpy.point_cloud2.array_to_pointcloud2(pointcloud_on_image) 
-                object_detection_array.pointcloud_in_frame_3D  = ros_numpy.point_cloud2.array_to_pointcloud2(pointcloud_in_FoV) 
-
                 self.seq = self.seq + 1 if self.seq < UINT32-1 else 0
 
                 # For every detected image object
@@ -163,27 +158,39 @@ class Node:
                     object_detection = ObjectDetection()
 
                     object_detection.class_id = object_detection_result["name"][i]
-                    object_detection.id       = 42 #TODO: Implement id 
+                    object_detection.id       = 0 #TODO: Implement id 
 
-                    object_detection.bounding_box_min_x = int(object_detection_result['xmin'][i])
-                    object_detection.bounding_box_min_y = int(object_detection_result['ymin'][i])
-                    object_detection.bounding_box_max_x = int(object_detection_result['xmax'][i])
-                    object_detection.bounding_box_max_y = int(object_detection_result['ymax'][i])
-
-                    object_detection.on_object_point_indices = list(on_object_list[i]) # if len(np.atleast_1d(on_object_list[i]))>1 else on_object_list[i]
+                    object_detection.pose_estimation_type = "measurement" # TODO Impelement it 
 
                     object_detection.pose.x = object_poses_list[i][0]
                     object_detection.pose.y = object_poses_list[i][1]
                     object_detection.pose.z = object_poses_list[i][2]
-                    
+
+                    if self.verbose:
+                        object_detection.bounding_box_min_x = int(object_detection_result['xmin'][i])
+                        object_detection.bounding_box_min_y = int(object_detection_result['ymin'][i])
+                        object_detection.bounding_box_max_x = int(object_detection_result['xmax'][i])
+                        object_detection.bounding_box_max_y = int(object_detection_result['ymax'][i])
+
+                        object_detection.on_object_point_indices = list(on_object_list[i])
+
                     object_detection_array.detections.append(object_detection)
             
+            if self.verbose:
+                # Convert arrays to correct format
+                pointcloud_on_image = np.c_[ pointcloud_on_image, np.zeros(pointcloud_on_image.shape[0]) ]
+                pointcloud_on_image = unstructured_to_structured( pointcloud_on_image, dtype = np.dtype( [('x', np.float32), ('y', np.float32), ('z', np.float32)] ))
+                pointcloud_in_FoV   = unstructured_to_structured( point_cloud_XYZ[in_FoV_indices], dtype = np.dtype( [('x', np.float32), ('y', np.float32), ('z', np.float32), ('i', np.float32)] ))
+                # Create verbose message fields
+                object_detection_array.detections_image        = self.imagereader.cv2_to_imgmsg(object_detection_image, 'bgr8')
+                object_detection_array.pointcloud_in_frame_2D  = ros_numpy.point_cloud2.array_to_pointcloud2(pointcloud_on_image) 
+                object_detection_array.pointcloud_in_frame_3D  = ros_numpy.point_cloud2.array_to_pointcloud2(pointcloud_in_FoV) 
+
             # Publish the message
             self.object_detection_pub.publish(object_detection_array)
 
         self.camera_info_sub = rospy.Subscriber(self.camera_info_topic , CameraInfo, self.image_info_callback)
-        if self.pointprojector.K is not None: 
-            self.synchronizer.registerCallback(callback)
+        self.synchronizer.registerCallback(callback)
 
         rospy.spin()
 

@@ -30,6 +30,7 @@
 
   <!--Object detection node-->
   <node name="objectify" pkg="object_detection" type="node.py" output="screen">
+
     <!--Input related-->
     <param name="camera_topic" value='$(arg input_camera_name)/undistorted'/>
     <param name="camera_info_topic" value='$(arg input_camera_name)/camera_info'/>
@@ -37,6 +38,7 @@
 
     <!--Output related-->
     <param name="object_detection_topic" value='/objects'/>
+    <param name="verbose" value='True'/>
 
     <!--Camera Lidar synchronization related-->
     <param name="camera_lidar_sync_queue_size" value="10"/>
