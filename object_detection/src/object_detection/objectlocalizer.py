@@ -24,8 +24,6 @@ class DetectedObject:
     pt_indices      : np.array
     estimation_type : str
 
-
-
 class ObjectLocalizer:
     def __init__(self, config, config_dir):
 
@@ -42,11 +40,8 @@ class ObjectLocalizer:
         self.cluster_selection_epsilon      = config["cluster_selection_epsilon"]
         
 
-        if self.distance_estimater_save_data:
-            self.data_dir                   = os.path.join(config_dir, "data")
-
-
         if self.distance_estimater_type  != "none":
+            self.data_dir           = os.path.join(config_dir, "data")
             self.learner_data_dir   = os.path.join(self.data_dir, self.distance_estimater_type)
             self.create_save_directory()
             
@@ -122,7 +117,7 @@ class ObjectLocalizer:
                (self.objects['ymax'][ind2] >= self.objects['ymin'][ind1]) 
 
     def object_id(self, class_id):
-        """Set intrinsic camera parameters.
+        """Returns the object unique id in the scene.
 
         Args:
             class_id    : class_id (string) 
@@ -169,8 +164,7 @@ class ObjectLocalizer:
         return p(self.object_unique_size(idx, self.obj_conf[class_id]['unique']))
             
     def points_in_BB(self, index):
-        """
-        Finds the 3D/2D point indices that fall into BB of given object by its index, along with the center point index and pos. 
+        """ Finds the 3D/2D point indices that fall into BB of given object by its index, along with the center point index and pos. 
 
         Args:
             index                   : index of the detected object in Pandas data frame
@@ -188,7 +182,7 @@ class ObjectLocalizer:
                                      (self.points2D[:,0] <= self.objects['xmax'][index] - x_diff * self.bb_contract_percentage / 100))
         inside_BB_y = np.logical_and((self.points2D[:,1] >= self.objects['ymin'][index] + y_diff * self.bb_contract_percentage / 100), \
                                      (self.points2D[:,1] <= self.objects['ymax'][index] - y_diff * self.bb_contract_percentage / 100))
-        inside_BB = np.nonzero(np.logical_and(inside_BB_x, inside_BB_y))
+        inside_BB = np.nonzero(np.logical_and(inside_BB_x, inside_BB_y))[0]
 
         center = np.array([(self.objects['xmin'][index]+self.objects['xmax'][index])/2.0, \
                   (self.objects['ymin'][index]+self.objects['ymax'][index])/2.0 ])
@@ -214,7 +208,7 @@ class ObjectLocalizer:
             if i == -1:
                 continue
 
-            indices_ = np.nonzero(cluster.labels_ == i)
+            indices_ = np.nonzero(cluster.labels_ == i)[0]
             min_val_ = np.abs( estimated_dist - min(in_BB_3D[indices_,AXIS_Z]) )
 
             if min_val_ < min_val:
@@ -222,16 +216,16 @@ class ObjectLocalizer:
                 min_val = min_val_
 
         if indices is None:
-
-            indices_ = np.nonzero(cluster.labels_ == i)
-            indices  = np.array( [np.argmin( np.abs( estimated_dist - in_BB_3D[indices_, AXIS_Z]) ) ] )
+            print("in None")
+            indices_ = np.nonzero(cluster.labels_ == -1)[0]
+            indices  = np.argmin( np.abs( estimated_dist - in_BB_3D[indices_, AXIS_Z]) )
             avg      = in_BB_3D[indices]
         
         else:          
             
             distances = np.squeeze(in_BB_3D[indices, AXIS_Z])
             # in_range_indices = np.nonzero( ( np.abs(distances - estimated_dist) - min( np.abs(distances - estimated_dist) ) ) < self.obj_conf[obj_class]["max_depth"] )
-            in_range_indices = np.nonzero( np.abs( min(distances) - distances ) < self.obj_conf[obj_class]["max_depth"] )
+            in_range_indices = np.nonzero( np.abs( min(distances) - distances ) < self.obj_conf[obj_class]["max_depth"] )[0]
 
             indices = indices[in_range_indices]   
             avg =  np.mean(in_BB_3D[indices], axis=0)
@@ -291,11 +285,13 @@ class ObjectLocalizer:
             on_object_ind   : pointcloud-in-frame indices that is on the object 
         """
 
-        new_obj = DetectedObject(idx=index)
         obj_class = self.objects["name"][index]
         
         # Id of the object 
-        new_obj.id = self.object_id(obj_class)
+        new_obj_id = self.object_id(obj_class)
+
+        # New Object data object
+        new_obj = DetectedObject( id=new_obj_id, idx=index, pos = None, pt_indices=None, estimation_type=None )
 
         in_BB_indices, center_ind, center = self.points_in_BB(index)
 
@@ -374,7 +370,7 @@ class ObjectLocalizer:
                 if self.distance_estimater_type == "bb2dist":    
                     self.save_data_bb2dist(ind, new_obj.pos)
                 else:
-                    msg = "Estimater type " + self.distance_estimater_type + " in not implemented."
+                    msg = "Estimater type " + self.distance_estimater_type + " is not implemented."
                     rospy.logerr(msg)
 
         return object_list

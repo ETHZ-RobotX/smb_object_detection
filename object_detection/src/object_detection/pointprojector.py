@@ -5,6 +5,10 @@ import numpy as np
 
 from object_detection.utils import check_validity_lidar2camera_transformation
 
+
+AXIS_X = 0
+AXIS_Y = 1
+
 class PointProjector:
     def __init__(self, config):
 
@@ -14,7 +18,7 @@ class PointProjector:
             R_correction        = self.config["R_correction"]
             t_camera_lidar      = self.config["t_camera_lidar"]
             t_correction        = self.config["t_correction"]
-            forward_axis        = self.config["forward_axis"]
+            self.forward_axis   = self.config["forward_axis"]
         
         if not check_validity_lidar2camera_transformation(R_camera_lidar, t_camera_lidar):
             msg = "Lidar to Camera transformation matrices are not correctly configured. Please check the file %s" %config
@@ -91,7 +95,7 @@ class PointProjector:
 
         # Take only front hemisphere points
         front_hemisphere = points[:, np.abs(self.forward_axis)-1] > 0  if self.forward_axis > 0 else points[:, np.abs(self.forward_axis)-1] < 0
-        front_hemisphere_indices = np.nonzero(front_hemisphere)
+        front_hemisphere_indices = np.nonzero(front_hemisphere)[0]
         indices = indices[front_hemisphere_indices]
 
         points = points[front_hemisphere_indices, :]
@@ -118,9 +122,9 @@ class PointProjector:
         points_on_image, indices = self.project_points(points)
         points_on_image = np.uint32(np.squeeze(points_on_image))
         
-        inside_frame_x = np.logical_and((points_on_image[:,0] >= 0), (points_on_image[:,0] < self.w-1))
-        inside_frame_y = np.logical_and((points_on_image[:,1] >= 0), (points_on_image[:,1] < self.h-1))
-        inside_frame_indices = np.nonzero(np.logical_and(inside_frame_x,inside_frame_y))
+        inside_frame_x = np.logical_and((points_on_image[:,AXIS_X] >= 0), (points_on_image[:,AXIS_X] < self.w-1))
+        inside_frame_y = np.logical_and((points_on_image[:,AXIS_Y] >= 0), (points_on_image[:,AXIS_Y] < self.h-1))
+        inside_frame_indices = np.nonzero(np.logical_and(inside_frame_x,inside_frame_y))[0]
 
         indices = indices[inside_frame_indices]
         points_on_image = points_on_image[inside_frame_indices,:]    

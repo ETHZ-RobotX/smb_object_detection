@@ -8,6 +8,7 @@ int32 bounding_box_max_y
 
 int32[] on_object_point_indices
 
-geometry_msgs/Point pose
+string pose_estimation_type
 
+geometry_msgs/Point pose
 

@@ -4,7 +4,7 @@ import sensor_msgs.point_cloud2 as pc2
 Z_UPWARDS   = 2
 
 def filter_ground(point3D, ground_percentage, upward = Z_UPWARDS):
-    """
+    """ Filter the ground according to given percentage. 
     Args:
         point3D                   : 3D point translated point cloud 
 
@@ -21,6 +21,13 @@ def filter_ground(point3D, ground_percentage, upward = Z_UPWARDS):
     return point3D[indices]
 
 def pointcloud2_to_xyzi(pointcloud2):
+    """ pointcloud2 to xyzi numpu array transformation
+    Args:
+        pointcloud2  : pointcloud2 ros message
+
+    Returns:
+        xyzi         : numpy array of nx4 of coordinate of lidar points 
+    """
     pc_list = pc2.read_points_list(pointcloud2, skip_nans=True)
     xyzi = np.zeros((len(pc_list),4))
     for ind, p in enumerate(pc_list):

@@ -2,9 +2,10 @@
 import rospy
 import ros_numpy
 import numpy as np
-import message_filters as mf
+from os.path import join
 from numpy.lib.recfunctions import unstructured_to_structured
 
+import message_filters as mf
 from cv_bridge import CvBridge
 from sensor_msgs.msg import Image, PointCloud2, CameraInfo
 
@@ -15,7 +16,7 @@ from object_detection.pointprojector    import PointProjector
 from object_detection.objectlocalizer   import ObjectLocalizer
 from object_detection.utils             import pointcloud2_to_xyzi, check_validity_image_info, filter_ground
 
-from os.path import join
+
 
 import warnings
 warnings.filterwarnings("ignore")
@@ -83,8 +84,8 @@ class Node:
             "distance_estimater_type"       :  rospy.get_param('~distance_estimater_type', 'bb2dist'),
             "distance_estimater_save_data"  :  rospy.get_param('~distance_estimater_save_data', 'False'),
             "object_specific_file"          :  rospy.get_param('~object_specific_file', 'object_specific.yaml'),
-            "min_cluster_size"              :  rospy.get_param('~min_cluster_size', 2),
-            "cluster_selection_epsilon"     :  rospy.get_param('~cluster_selection_epsilon', 0.05),
+            "min_cluster_size"              :  rospy.get_param('~min_cluster_size', 5),
+            "cluster_selection_epsilon"     :  rospy.get_param('~cluster_selection_epsilon', 0.02),
         }
 
         # ---------- Objects of Actions ----------
@@ -106,6 +107,7 @@ class Node:
 
         if check_validity_image_info(K, w, h):
             self.pointprojector.set_intrinsic_params(K, [w,h])
+            self.objectlocalizer.set_intrinsic_camera_param(K)
             rospy.loginfo("Image info is set! Detection is starting in 1 sec!")
             rospy.sleep(1)
             self.seq = 0
@@ -160,18 +162,18 @@ class Node:
                 object_detection_array.header.seq              = self.seq
                 self.seq = self.seq + 1 if self.seq < UINT32-1 else 0
 
-                # For every detected image object
+                # For every detected image object, fill the message object. 
                 for i in range(len(object_detection_result)):
                     object_detection = ObjectDetection()
 
                     object_detection.class_id = object_detection_result["name"][i]
                     object_detection.id       = object_list[i].id
 
-                    object_detection.pose_estimation_type = object_list[i].estimation_type # TODO Impelement it 
+                    object_detection.pose_estimation_type = object_list[i].estimation_type 
 
-                    object_detection.pose.x = object_list[i].pose[0]
-                    object_detection.pose.y = object_list[i].pose[1]
-                    object_detection.pose.z = object_list[i].pose[2]
+                    object_detection.pose.x = object_list[i].pos[0]
+                    object_detection.pose.y = object_list[i].pos[1]
+                    object_detection.pose.z = object_list[i].pos[2]
 
                     if self.verbose:
                         object_detection.bounding_box_min_x = int(object_detection_result['xmin'][i])
@@ -179,22 +181,22 @@ class Node:
                         object_detection.bounding_box_max_x = int(object_detection_result['xmax'][i])
                         object_detection.bounding_box_max_y = int(object_detection_result['ymax'][i])
 
-                        object_detection.on_object_point_indices = list(object_list[i].pt_indices)
+                        object_detection.on_object_point_indices = list(object_list[i].pt_indices) if type(object_list[i].pt_indices) == 'numpy.ndarray' else list(np.array([object_list[i].pt_indices]))
 
                     object_detection_array.detections.append(object_detection)
             
-            if self.verbose:
-                # Convert arrays to correct format
-                pointcloud_on_image = np.c_[ pointcloud_on_image, np.zeros(pointcloud_on_image.shape[0]) ]
-                pointcloud_on_image = unstructured_to_structured( pointcloud_on_image, dtype = np.dtype( [('x', np.float32), ('y', np.float32), ('z', np.float32)] ))
-                pointcloud_in_FoV   = unstructured_to_structured( point_cloud_XYZ[in_FoV_indices], dtype = np.dtype( [('x', np.float32), ('y', np.float32), ('z', np.float32), ('i', np.float32)] ))
-                # Create verbose message fields
-                object_detection_array.detections_image        = self.imagereader.cv2_to_imgmsg(object_detection_image, 'bgr8')
-                object_detection_array.pointcloud_in_frame_2D  = ros_numpy.point_cloud2.array_to_pointcloud2(pointcloud_on_image) 
-                object_detection_array.pointcloud_in_frame_3D  = ros_numpy.point_cloud2.array_to_pointcloud2(pointcloud_in_FoV) 
+                if self.verbose:
+                    # Convert arrays to correct format
+                    pointcloud_on_image = np.c_[ pointcloud_on_image, np.zeros(pointcloud_on_image.shape[0]) ]
+                    pointcloud_on_image = unstructured_to_structured( pointcloud_on_image, dtype = np.dtype( [('x', np.float32), ('y', np.float32), ('z', np.float32)] ))
+                    pointcloud_in_FoV   = unstructured_to_structured( point_cloud_XYZ[in_FoV_indices], dtype = np.dtype( [('x', np.float32), ('y', np.float32), ('z', np.float32), ('i', np.float32)] ))
+                    # Create verbose message fields
+                    object_detection_array.detections_image        = self.imagereader.cv2_to_imgmsg(object_detection_image, 'bgr8')
+                    object_detection_array.pointcloud_in_frame_2D  = ros_numpy.point_cloud2.array_to_pointcloud2(pointcloud_on_image) 
+                    object_detection_array.pointcloud_in_frame_3D  = ros_numpy.point_cloud2.array_to_pointcloud2(pointcloud_in_FoV) 
 
-            # Publish the message
-            self.object_detection_pub.publish(object_detection_array)
+                # Publish the message
+                self.object_detection_pub.publish(object_detection_array)
 
         self.camera_info_sub = rospy.Subscriber(self.camera_info_topic , CameraInfo, self.image_info_callback)
         self.synchronizer.registerCallback(callback)

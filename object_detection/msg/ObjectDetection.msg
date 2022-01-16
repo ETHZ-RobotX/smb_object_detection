@@ -12,4 +12,3 @@ string pose_estimation_type
 
 geometry_msgs/Point pose
 
-
