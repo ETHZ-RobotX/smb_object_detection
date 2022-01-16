@@ -1,6 +1,24 @@
 import numpy as np
 import sensor_msgs.point_cloud2 as pc2
 
+Z_UPWARDS   = 2
+
+def filter_ground(point3D, ground_percentage, upward = Z_UPWARDS):
+    """
+    Args:
+        point3D                   : 3D point translated point cloud 
+
+    Returns:
+        non_groun_point3D         : indices of points that are not ground
+    """
+
+    if upward < 0:
+        indices = np.nonzero(point3D[:,-upward] < max(point3D[:,-upward])*ground_percentage)[0]
+        
+    else:
+        indices = np.nonzero(point3D[:,upward] > min(point3D[:,upward])*ground_percentage)[0]
+    
+    return point3D[indices]
 
 def pointcloud2_to_xyzi(pointcloud2):
     pc_list = pc2.read_points_list(pointcloud2, skip_nans=True)

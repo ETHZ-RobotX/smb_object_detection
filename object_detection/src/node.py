@@ -13,7 +13,7 @@ from object_detection.msg import ObjectDetection, ObjectDetectionArray
 from object_detection.objectdetector    import ObjectDetector
 from object_detection.pointprojector    import PointProjector
 from object_detection.objectlocalizer   import ObjectLocalizer
-from object_detection.utils             import pointcloud2_to_xyzi, check_validity_image_info
+from object_detection.utils             import pointcloud2_to_xyzi, check_validity_image_info, filter_ground
 
 from os.path import join
 
@@ -22,7 +22,6 @@ warnings.filterwarnings("ignore")
 
 
 UINT32      = 2**32 - 1
-Z_UPWARDS   = 2
 
 class Node:
     def __init__(self):
@@ -79,10 +78,13 @@ class Node:
         # ---------- 3D Object Localizer Related ----------
         self.objectlocalizer_cfg = {
             "model_method"                  :  rospy.get_param('~model_method', 'hdbscan'),
-            "ground_percentage"             :  rospy.get_param('~ground_percentage', '0.6'),
+            "ground_percentage"             :  rospy.get_param('~ground_percentage', 0.6),
+            "bb_contract_percentage"        :  rospy.get_param('~bb_contract_percentage', 0.0),
             "distance_estimater_type"       :  rospy.get_param('~distance_estimater_type', 'bb2dist'),
             "distance_estimater_save_data"  :  rospy.get_param('~distance_estimater_save_data', 'False'),
-            "object_specific_file"          :  rospy.get_param('~object_specific_file', 'object_specific.yaml')
+            "object_specific_file"          :  rospy.get_param('~object_specific_file', 'object_specific.yaml'),
+            "min_cluster_size"              :  rospy.get_param('~min_cluster_size', 2),
+            "cluster_selection_epsilon"     :  rospy.get_param('~cluster_selection_epsilon', 0.05),
         }
 
         # ---------- Objects of Actions ----------
@@ -103,7 +105,7 @@ class Node:
         self.seq += 1
 
         if check_validity_image_info(K, w, h):
-            self.pointprojector.set_cameraparams(K, [w,h])
+            self.pointprojector.set_intrinsic_params(K, [w,h])
             rospy.loginfo("Image info is set! Detection is starting in 1 sec!")
             rospy.sleep(1)
             self.seq = 0
@@ -119,7 +121,12 @@ class Node:
     def run(self):
 
         def callback(image_msg, lidar_msg):
-            # If Image and Lidar messages are not empty 
+            # If Image and Lidar messages are not empty
+            if not image_msg.height > 0:
+                rospy.logfatal("Image message is empty. Object detecion is in hold.")
+            if not lidar_msg.width > 0:
+                rospy.logfatal("Lidar message is empty. Object detecion is in hold.")
+
             if self.image_info_recieved and image_msg.height > 0 and lidar_msg.width > 0:
                 
                 # Read lidar message
@@ -128,11 +135,11 @@ class Node:
                 # Ground filter 
                 # Upward direction is Z which 3rd column in the matrix
                 # It is positive because it increases upwards
-                point_cloud_XYZ = self.objectlocalizer.filter_ground(point_cloud_XYZ, Z_UPWARDS)
+                point_cloud_XYZ = filter_ground(point_cloud_XYZ, self.objectlocalizer_cfg["ground_percentage"])
 
                 # translate and project PointCloud onto the Image  
-                point_cloud_XYZ[:,:3] = self.pointprojector.translatePoints(point_cloud_XYZ[:,:3])
-                pointcloud_on_image , in_FoV_indices = self.pointprojector.projectPointsOnImage(point_cloud_XYZ[:,:3])
+                point_cloud_XYZ[:,:3] = self.pointprojector.transform_points(point_cloud_XYZ[:,:3])
+                pointcloud_on_image , in_FoV_indices = self.pointprojector.project_points_on_image(point_cloud_XYZ[:,:3])
 
                 # transform the image msg to numpy array
                 cv_image = self.imagereader.imgmsg_to_cv2(image_msg, "bgr8")
@@ -141,10 +148,10 @@ class Node:
                 object_detection_result, object_detection_image = self.objectdetector.detect(cv_image)
                 
                 # Localize every detected object
-                object_poses_list, on_object_list = self.objectlocalizer.localize(object_detection_result, \
-                                                                                  pointcloud_on_image, \
-                                                                                  point_cloud_XYZ[in_FoV_indices], \
-                                                                                  cv_image  )
+                object_list = self.objectlocalizer.localize(object_detection_result, \
+                                                            pointcloud_on_image, \
+                                                            point_cloud_XYZ[in_FoV_indices], \
+                                                            cv_image  )
  
                 # Create object detection message
                 object_detection_array = ObjectDetectionArray()
@@ -158,13 +165,13 @@ class Node:
                     object_detection = ObjectDetection()
 
                     object_detection.class_id = object_detection_result["name"][i]
-                    object_detection.id       = 0 #TODO: Implement id 
+                    object_detection.id       = object_list[i].id
 
-                    object_detection.pose_estimation_type = "measurement" # TODO Impelement it 
+                    object_detection.pose_estimation_type = object_list[i].estimation_type # TODO Impelement it 
 
-                    object_detection.pose.x = object_poses_list[i][0]
-                    object_detection.pose.y = object_poses_list[i][1]
-                    object_detection.pose.z = object_poses_list[i][2]
+                    object_detection.pose.x = object_list[i].pose[0]
+                    object_detection.pose.y = object_list[i].pose[1]
+                    object_detection.pose.z = object_list[i].pose[2]
 
                     if self.verbose:
                         object_detection.bounding_box_min_x = int(object_detection_result['xmin'][i])
@@ -172,7 +179,7 @@ class Node:
                         object_detection.bounding_box_max_x = int(object_detection_result['xmax'][i])
                         object_detection.bounding_box_max_y = int(object_detection_result['ymax'][i])
 
-                        object_detection.on_object_point_indices = list(on_object_list[i])
+                        object_detection.on_object_point_indices = list(object_list[i].pt_indices)
 
                     object_detection_array.detections.append(object_detection)
             

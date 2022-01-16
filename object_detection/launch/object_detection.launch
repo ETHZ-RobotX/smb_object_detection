@@ -62,8 +62,11 @@
     <!--Object localization related-->
     <param name="model_method" value='hdbscan'/>
     <param name="ground_percentage" value='0.6'/>
+    <param name="bb_contract_percentage" value='0.0'/>
     <param name="distance_estimater_type" value='bb2dist'/>
     <param name="distance_estimater_save_data" value='False'/>
+
+    
 
   </node>
 
