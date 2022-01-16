@@ -181,7 +181,7 @@ class Node:
                         object_detection.bounding_box_max_x = int(object_detection_result['xmax'][i])
                         object_detection.bounding_box_max_y = int(object_detection_result['ymax'][i])
 
-                        object_detection.on_object_point_indices = list(object_list[i].pt_indices) if type(object_list[i].pt_indices) == 'numpy.ndarray' else list(np.array([object_list[i].pt_indices]))
+                        object_detection.on_object_point_indices = list(object_list[i].pt_indices) # if type(object_list[i].pt_indices) == 'numpy.ndarray' else list(np.array([object_list[i].pt_indices]))
 
                     object_detection_array.detections.append(object_detection)
             

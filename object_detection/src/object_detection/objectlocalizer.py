@@ -195,7 +195,7 @@ class ObjectLocalizer:
 
         return inside_BB, center_ind, center
 
-    def method_hdbscan_closeness(self,in_BB_3D, center_id, obj_class, estimated_dist):
+    def method_hdbscan_closeness(self,in_BB_3D, obj_class, estimated_dist):
         
         cluster = hdbscan.HDBSCAN(min_cluster_size=self.min_cluster_size , \
                                   cluster_selection_epsilon=self.cluster_selection_epsilon).fit(in_BB_3D[:,[AXIS_X, AXIS_Z]])
@@ -216,7 +216,6 @@ class ObjectLocalizer:
                 min_val = min_val_
 
         if indices is None:
-            print("in None")
             indices_ = np.nonzero(cluster.labels_ == -1)[0]
             indices  = np.argmin( np.abs( estimated_dist - in_BB_3D[indices_, AXIS_Z]) )
             avg      = in_BB_3D[indices]
@@ -224,16 +223,12 @@ class ObjectLocalizer:
         else:          
             
             distances = np.squeeze(in_BB_3D[indices, AXIS_Z])
-            # in_range_indices = np.nonzero( ( np.abs(distances - estimated_dist) - min( np.abs(distances - estimated_dist) ) ) < self.obj_conf[obj_class]["max_depth"] )
-            in_range_indices = np.nonzero( np.abs( min(distances) - distances ) < self.obj_conf[obj_class]["max_depth"] )[0]
+            # in_range_indices = np.nonzero( ( np.abs(distances - estimated_dist) - min( np.abs(distances - estimated_dist) ) ) < self.obj_conf[obj_class]["max_depth"] )[0]
+            in_range_indices = np.nonzero( np.abs( estimated_dist - distances ) < self.obj_conf[obj_class]["max_depth"] / 2.0 )[0]
 
             indices = indices[in_range_indices]   
             avg =  np.mean(in_BB_3D[indices], axis=0)
-            
-        center_point = in_BB_3D[center_id]
-        center_point[[AXIS_X, AXIS_Y]] = center_point[[AXIS_X, AXIS_Y]] * (avg[AXIS_Z] / center_point[AXIS_Z])
-        avg[[AXIS_X, AXIS_Y]] = center_point[[AXIS_X, AXIS_Y]]
-                 
+                             
         return avg, indices
         
     def method_kMeans(self,in_BB_3D):
@@ -297,7 +292,6 @@ class ObjectLocalizer:
 
         # If no points falls inside the BB
         if center_ind == NO_POSE :
-
             if self.distance_estimater_type == "none":
                 new_obj.pt_indices      = np.array([NO_POSE])
                 new_obj.pos             = np.array([0,0, NO_POSE])
@@ -306,7 +300,7 @@ class ObjectLocalizer:
             else:
                 estimated_dist = self.estimate_dist_bb2dist(index, obj_class)
 
-                new_obj.pt_indices      = np.array([center_ind])
+                new_obj.pt_indices      = np.array([NO_POSE])
                 new_obj.pos             = self.estimate_pos_with_BB_center(center, estimated_dist)
                 new_obj.estimation_type = "estimation"
 
@@ -320,7 +314,7 @@ class ObjectLocalizer:
                 if self.distance_estimater_type != "bb2dist":
                     estimated_dist = self.estimate_dist_bb2dist(index, obj_class)
 
-                pos, on_object = self.method_hdbscan_closeness(in_BB_3D, center_ind, obj_class, estimated_dist)
+                pos, on_object = self.method_hdbscan_closeness(in_BB_3D, obj_class, estimated_dist)
 
             elif self.model_method == "mean":
                 on_object = np.arange(0,in_BB_3D.shape[0])
@@ -334,7 +328,12 @@ class ObjectLocalizer:
             elif self.model_method == "histogram":
                 pos, on_object = self.method_histogram(in_BB_3D)
             
-            new_obj.pt_indices      = in_BB_indices[on_object]
+            # Allign with the bounding box center
+            center_point = in_BB_3D[center_ind]
+            center_point[[AXIS_X, AXIS_Y]] = center_point[[AXIS_X, AXIS_Y]] * (pos[AXIS_Z] / center_point[AXIS_Z])
+            pos[[AXIS_X, AXIS_Y]] = center_point[[AXIS_X, AXIS_Y]]
+            
+            new_obj.pt_indices      = np.array([in_BB_indices[on_object]]) if isinstance(on_object, np.int64) else in_BB_indices[on_object]
             new_obj.pos             = pos
             new_obj.estimation_type = "measurement"
 
@@ -349,8 +348,7 @@ class ObjectLocalizer:
             image       : RGB image of detection
         
         Returns:
-            object_poses   : n size list of arrays that contains position of the objects acc. camera frame
-            on_object_list : n size list of arrays that contains indices of points that fall onto the object for every object
+            object_list : list of DetectedObjects correspond to the order of the input objects structure. 
 
         """
 
