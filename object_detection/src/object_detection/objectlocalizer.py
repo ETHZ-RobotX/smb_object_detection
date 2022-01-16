@@ -221,10 +221,9 @@ class ObjectLocalizer:
             avg      = in_BB_3D[indices]
         
         else:          
-            
             distances = np.squeeze(in_BB_3D[indices, AXIS_Z])
-            # in_range_indices = np.nonzero( ( np.abs(distances - estimated_dist) - min( np.abs(distances - estimated_dist) ) ) < self.obj_conf[obj_class]["max_depth"] )[0]
-            in_range_indices = np.nonzero( np.abs( estimated_dist - distances ) < self.obj_conf[obj_class]["max_depth"] / 2.0 )[0]
+            in_range_indices = np.nonzero( ( np.abs(distances - estimated_dist) - min( np.abs(distances - estimated_dist) ) ) < self.obj_conf[obj_class]["max_depth"] )[0]
+            # in_range_indices = np.nonzero( np.abs( min(distances) - distances ) < self.obj_conf[obj_class]["max_depth"] / 2.0 )[0]
 
             indices = indices[in_range_indices]   
             avg =  np.mean(in_BB_3D[indices], axis=0)

@@ -2,3 +2,6 @@
 *.bag
 *.txt
 __pycache__/
+map/
+smb_description/
+aprilta_ros/

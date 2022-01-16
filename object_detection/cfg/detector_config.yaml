@@ -1,7 +1,0 @@
-architecture  : yolo
-model         : yolov5m6
-checkpoint    : null
-device        : cpu
-confident     : 0.4
-iou           : 0.1
-classes       : [0, 1] # [0, 1, 25, 74]

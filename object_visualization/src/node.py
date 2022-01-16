@@ -51,7 +51,6 @@ class Node:
         else:
             for idx, object in enumerate(objects):
                 on_obj_indices = np.array(object.on_object_point_indices)
-
                 # No pose estimation for the object
                 # No points fall into Bounding Box
                 if on_obj_indices[0] == NO_POSE:
