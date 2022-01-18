@@ -1,7 +1,7 @@
 <launch>
 
-  <arg name="rosbag_name" default="bike_0_13_smb"/>
-  <arg name="rosbag_path" default="/media/oilter/D4561E4E561E31AA/SemesterProject/objectsFinal/$(arg rosbag_name).bag"/>
+  <arg name="rosbag_name" default="bike_5_smb"/>
+  <arg name="rosbag_path" default="/home/oilter/Downloads/$(arg rosbag_name).bag"/>
 
   <arg name="camera_calib_path" default="$(find object_detection)/cfg/smb264_camera_model.yaml"/>
 
@@ -9,7 +9,7 @@
   <arg name="input_camera_name" default="/versavis/cam0" />
   <arg name="lidar_topic" default='/rslidar_points'/>
 
-  <arg name="object_detection_classes" default="[0, 1]"/>
+  <arg name="object_detection_classes" default="[1]"/>
 
   <!--Debayer the image-->
   <node pkg="image_proc" type="image_proc" name="debayer" ns="$(arg input_camera_name)/" />
@@ -52,7 +52,7 @@
 
     <!--Object detection related-->
     <param name="architecture" value='yolo'/>
-    <param name="model" value='yolov5n6'/>
+    <param name="model" value='yolov5l6'/>
     <param name="device" value='cpu'/>
     <param name="confident" value='0.4'/>
     <param name="iou" value='0.1'/>
@@ -63,8 +63,8 @@
     <param name="model_method" value='hdbscan'/>
     <param name="ground_percentage" value='0.6'/>
     <param name="bb_contract_percentage" value='0.0'/>
-    <param name="distance_estimater_type" value='bb2dist'/>
-    <param name="distance_estimater_save_data" value='False'/>
+    <param name="distance_estimator_type" value='bb2dist'/>
+    <param name="distance_estimator_save_data" value='True'/>
 
     
 

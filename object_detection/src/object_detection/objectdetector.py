@@ -1,12 +1,10 @@
-import yaml
-
 import torch
 
-from detectron2 import model_zoo
-from detectron2.engine import DefaultPredictor
-from detectron2.config import get_cfg
-from detectron2.utils.visualizer import Visualizer
-from detectron2.data import MetadataCatalog
+# from detectron2 import model_zoo
+# from detectron2.engine import DefaultPredictor
+# from detectron2.config import get_cfg
+# from detectron2.utils.visualizer import Visualizer
+# from detectron2.data import MetadataCatalog
 
 from rospy.exceptions import ROSInitException 
 
@@ -89,13 +87,12 @@ class ObjectDetector:
                 detection = self.filter_detection(detection)
             return detection, output.render()[0]
 
-        elif self.architecture == 'detectron':
-            outputs = self.detector(image)
-            v = Visualizer(image[:, :, ::-1], MetadataCatalog.get(self.cfg.DATASETS.TRAIN[0]), scale=1.2)
-            out = v.draw_instance_predictions(outputs["instances"].to("cpu"))
-            
-            # TODO: implement a function to transform output to the panda frame
-            # output = self.transform2pandaframe(output)
-
-            return outputs, out.get_image()[:, :, ::-1] 
+        # elif self.architecture == 'detectron':
+        #     outputs = self.detector(image)
+        #     v = Visualizer(image[:, :, ::-1], MetadataCatalog.get(self.cfg.DATASETS.TRAIN[0]), scale=1.2)
+        #     out = v.draw_instance_predictions(outputs["instances"].to("cpu"))
+        #     
+        #     # TODO: implement a function to transform output to the panda frame
+        #     # output = self.transform2pandaframe(output) 
+        #     return outputs, out.get_image()[:, :, ::-1] 
 

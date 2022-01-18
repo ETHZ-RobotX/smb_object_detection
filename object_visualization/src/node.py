@@ -25,7 +25,7 @@ class Node:
         self.visualize_all                  = rospy.get_param('~visualize_all', False)
         self.map_frame                      = rospy.get_param('~map_frame', 'map')
 
-        self.tf_buffer                      = tf2_ros.Buffer(rospy.Duration(4.0)) #tf buffer length
+        self.tf_buffer                      = tf2_ros.Buffer(rospy.Duration(20.0)) #tf buffer length
         self.tf_listener                    = tf2_ros.TransformListener(self.tf_buffer)
         self.TF_br                          = tf2_ros.StaticTransformBroadcaster()
         self.cv_bridge                      = CvBridge()
@@ -88,7 +88,7 @@ class Node:
             try:
                 transform = self.tf_buffer.lookup_transform_full(self.map_frame, detection.header.stamp, \
                                                                 obj_class + str(obj_id), detection.header.stamp, \
-                                                                self.map_frame, rospy.Duration(2.0))
+                                                                self.map_frame, rospy.Duration(20.0))
             except:
                 print("cannot transform \n")
                 continue

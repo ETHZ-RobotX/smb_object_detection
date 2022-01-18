@@ -27,7 +27,7 @@ UINT32      = 2**32 - 1
 class Node:
     def __init__(self):
         
-        rospy.loginfo("Object Detector initilization starts ...")
+        rospy.loginfo("[ObjectDetection Node] Object Detector initilization starts ...")
 
         # Initilized the node 
         rospy.init_node("objectify", anonymous=True)
@@ -81,8 +81,8 @@ class Node:
             "model_method"                  :  rospy.get_param('~model_method', 'hdbscan'),
             "ground_percentage"             :  rospy.get_param('~ground_percentage', 0.6),
             "bb_contract_percentage"        :  rospy.get_param('~bb_contract_percentage', 0.0),
-            "distance_estimater_type"       :  rospy.get_param('~distance_estimater_type', 'bb2dist'),
-            "distance_estimater_save_data"  :  rospy.get_param('~distance_estimater_save_data', 'False'),
+            "distance_estimator_type"       :  rospy.get_param('~distance_estimator_type', 'bb2dist'),
+            "distance_estimator_save_data"  :  rospy.get_param('~distance_estimator_save_data', 'False'),
             "object_specific_file"          :  rospy.get_param('~object_specific_file', 'object_specific.yaml'),
             "min_cluster_size"              :  rospy.get_param('~min_cluster_size', 5),
             "cluster_selection_epsilon"     :  rospy.get_param('~cluster_selection_epsilon', 0.02),
@@ -94,8 +94,8 @@ class Node:
         self.objectdetector                 = ObjectDetector( self.objectdetector_cfg )           
         self.objectlocalizer                = ObjectLocalizer( self.objectlocalizer_cfg, self.config_dir )
         
-        rospy.loginfo("Object Detector initilization done.")
-        rospy.loginfo("Waiting for image info ...")
+        rospy.loginfo("[ObjectDetection Node] Object Detector initilization done.")
+        rospy.loginfo("[ObjectDetection Node] Waiting for image info ...")
     
 
     def image_info_callback(self, camera_info):
@@ -108,16 +108,16 @@ class Node:
         if check_validity_image_info(K, w, h):
             self.pointprojector.set_intrinsic_params(K, [w,h])
             self.objectlocalizer.set_intrinsic_camera_param(K)
-            rospy.loginfo("Image info is set! Detection is starting in 1 sec!")
+            rospy.loginfo("[ObjectDetection Node] Image info is set! Detection is starting in 1 sec!")
             rospy.sleep(1)
             self.seq = 0
             self.image_info_recieved = True
             self.camera_info_sub.unregister()
         else:
             if self.seq > 10:
-                rospy.logerr("Image info could not be set after 10th try! Please check image info!")
+                rospy.logerr("[ObjectDetection Node] Image info could not be set after 10th try! Please check image info!")
                 rospy.signal_shutdown("Image info missing!")
-            rospy.loginfo("Image info is not set! Trying again after 1 sec!")
+            rospy.loginfo("[ObjectDetection Node] Image info is not set! Trying again after 1 sec!")
             rospy.sleep(1)
 
     def run(self):
@@ -125,9 +125,9 @@ class Node:
         def callback(image_msg, lidar_msg):
             # If Image and Lidar messages are not empty
             if not image_msg.height > 0:
-                rospy.logfatal("Image message is empty. Object detecion is in hold.")
+                rospy.logfatal("[ObjectDetection Node] Image message is empty. Object detecion is on hold.")
             if not lidar_msg.width > 0:
-                rospy.logfatal("Lidar message is empty. Object detecion is in hold.")
+                rospy.logfatal("[ObjectDetection Node] Lidar message is empty. Object detecion is on hold.")
 
             if self.image_info_recieved and image_msg.height > 0 and lidar_msg.width > 0:
                 
@@ -206,7 +206,7 @@ class Node:
 if __name__ == '__main__':
 
     node = Node()
-    rospy.loginfo("Detection has started")
+    rospy.loginfo("[ObjectDetection Node] Detection has started")
     node.run()
 
     

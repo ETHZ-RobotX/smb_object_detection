@@ -8,6 +8,8 @@ from scipy.signal import find_peaks
 
 from dataclasses import dataclass
 
+# TODO: Handle better minus bb2dist prediction
+
 NO_POSE     = -1
 MAX_DIST    = 999999
 
@@ -33,25 +35,43 @@ class ObjectLocalizer:
             self.obj_conf               = yaml.load(file, Loader=yaml.FullLoader)
 
         self.model_method                   = config["model_method"].lower()
-        self.distance_estimater_type        = config["distance_estimater_type"].lower()
-        self.distance_estimater_save_data   = config["distance_estimater_save_data"]
+        self.distance_estimator_type        = config["distance_estimator_type"].lower()
+        self.distance_estimator_save_data   = config["distance_estimator_save_data"]
         self.bb_contract_percentage         = config["bb_contract_percentage"]
         self.min_cluster_size               = config["min_cluster_size"]
         self.cluster_selection_epsilon      = config["cluster_selection_epsilon"]
         
+        self.distance_estimator             = self.estimate_dist_default
+        
 
-        if self.distance_estimater_type  != "none":
-            self.data_dir           = os.path.join(config_dir, "data")
-            self.learner_data_dir   = os.path.join(self.data_dir, self.distance_estimater_type)
-            self.create_save_directory()
+        if self.distance_estimator_type  != "none":
             
-            self.estimate_dist_cfg_dir  = os.path.join(config_dir, self.distance_estimater_type + ".yaml" )
+            try:
+                with open(os.path.join(config_dir, self.distance_estimator_type + ".yaml" )) as file:
+                    self.estimate_dist_cfg  = yaml.load(file, Loader=yaml.FullLoader)
+                self.distance_estimator = getattr(self, 'estimate_dist_'+self.distance_estimator_type)
+                msg = "[objectlocalizer] Distance estimator " + self.distance_estimator_type + " has been set."
+                rospy.loginfo(msg)
+            except:
+                msg = "[objectlocalizer] Distance estimator " + self.distance_estimator_type + " is not defined. Default one will be used. Check available estimators."
+                rospy.logerr(msg)
 
-            with open(self.estimate_dist_cfg_dir) as file:
-                self.estimate_dist_cfg  = yaml.load(file, Loader=yaml.FullLoader)
+
+            if self.distance_estimator_save_data :
+                msg1 = "[objectlocalizer] New data will be collected for " + self.distance_estimator_type + " estimator. Please refer to the save data instructions."
+                msg2 = "[objectlocalizer] Distance estimator will not be used during the data collection."
+                self.data_saver         = getattr(self, 'save_data_'+self.distance_estimator_type)
+                self.distance_estimator = self.estimate_dist_default
+                rospy.loginfo(msg1)
+                rospy.loginfo(msg2)
+                
+                self.learner_data_dir   = os.path.join(os.path.join(config_dir, "data"), self.distance_estimator_type)
+                self.create_save_directory()
 
         else:
-            rospy.loginfo("Learner type was not specified. Data will not be saved.")
+            self.distance_estimator_save_data = False
+            rospy.loginfo("[objectlocalizer] Estimator/Learner type is None. No estimator will be used. Data will not be saved.")
+
 
     def set_scene(self, objects, points2D, points3D, image=None ):
         """Set the scene info such as objects, points2D, points3D, image.
@@ -76,11 +96,13 @@ class ObjectLocalizer:
     
     def create_save_directory(self):
         
-        if self.distance_estimater_type == "bb2dist":
+        if self.distance_estimator_type == "bb2dist":
             if not os.path.exists( self.learner_data_dir):
                 os.makedirs(self.learner_data_dir)
                  
-    def save_data_bb2dist(self, ind, pose):
+    def save_data_bb2dist(self, input):
+        
+        ind, pose = input[0], input[1]
         
         for i in range(len(self.objects)): 
 
@@ -150,18 +172,31 @@ class ObjectLocalizer:
 
         return [X, Y, est_dist]
     
-    def estimate_dist_bb2dist(self, idx, class_id):
+    def estimate_dist_default(self, input):
+        """ Default object distance estimator. Returns always 0
+        
+        Args:
+            input          : dummy input
+
+        Returns:
+            0
+        """
+        return 0
+    
+    def estimate_dist_bb2dist(self, input):
         """ Estimate the object distance with the bb2dist method.
         
         Args:
-            idx            : index of the target object in the input panda data frame 
-            class_id       : class id of the object ex: person, car, bike ...
+            input          : list of necessary inputs 
+            input[0]       : index of the target object in the input panda data frame 
+            input[1]       : class id of the object ex: person, car, bike ...
         
         Returns:
             estimated_dist : Estimated 3D point in camera frame 
         """
+        idx, class_id = input[0], input[1]
         p = np.poly1d(self.estimate_dist_cfg[class_id])
-        return p(self.object_unique_size(idx, self.obj_conf[class_id]['unique']))
+        return max(p(self.object_unique_size(idx, self.obj_conf[class_id]['unique'])), 0.5)
             
     def points_in_BB(self, index):
         """ Finds the 3D/2D point indices that fall into BB of given object by its index, along with the center point index and pos. 
@@ -291,13 +326,13 @@ class ObjectLocalizer:
 
         # If no points falls inside the BB
         if center_ind == NO_POSE :
-            if self.distance_estimater_type == "none":
+            if self.distance_estimator_type == "none":
                 new_obj.pt_indices      = np.array([NO_POSE])
                 new_obj.pos             = np.array([0,0, NO_POSE])
                 new_obj.estimation_type = "none"
             
             else:
-                estimated_dist = self.estimate_dist_bb2dist(index, obj_class)
+                estimated_dist = self.distance_estimator([index, obj_class])
 
                 new_obj.pt_indices      = np.array([NO_POSE])
                 new_obj.pos             = self.estimate_pos_with_BB_center(center, estimated_dist)
@@ -309,10 +344,7 @@ class ObjectLocalizer:
             
             if self.model_method == "hdbscan":
 
-                estimated_dist = 0
-                if self.distance_estimater_type != "bb2dist":
-                    estimated_dist = self.estimate_dist_bb2dist(index, obj_class)
-
+                estimated_dist = self.distance_estimator([index, obj_class])
                 pos, on_object = self.method_hdbscan_closeness(in_BB_3D, obj_class, estimated_dist)
 
             elif self.model_method == "mean":
@@ -363,12 +395,8 @@ class ObjectLocalizer:
             new_obj =  self.get_object_pos(ind)
             object_list.append(new_obj)
 
-            if self.distance_estimater_save_data :
-                if self.distance_estimater_type == "bb2dist":    
-                    self.save_data_bb2dist(ind, new_obj.pos)
-                else:
-                    msg = "Estimater type " + self.distance_estimater_type + " is not implemented."
-                    rospy.logerr(msg)
+            if self.distance_estimator_save_data :
+                self.data_saver([ind, new_obj.pos])
 
         return object_list
 
