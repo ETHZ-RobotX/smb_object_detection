@@ -255,9 +255,16 @@ class ObjectLocalizer:
             indices  = np.argmin( np.abs( estimated_dist - in_BB_3D[indices_, AXIS_Z]) )
             avg      = in_BB_3D[indices]
         
-        else:          
+        else:  
+
+            try:
+                max_depth = self.obj_conf[obj_class]["max_depth"]
+            except:
+                max_depth = 10
+
+
             distances = np.squeeze(in_BB_3D[indices, AXIS_Z])
-            in_range_indices = np.nonzero( ( np.abs(distances - estimated_dist) - min( np.abs(distances - estimated_dist) ) ) < self.obj_conf[obj_class]["max_depth"] )[0]
+            in_range_indices = np.nonzero( ( np.abs(distances - estimated_dist) - min( np.abs(distances - estimated_dist) ) ) < max_depth )[0]
             # in_range_indices = np.nonzero( np.abs( min(distances) - distances ) < self.obj_conf[obj_class]["max_depth"] / 2.0 )[0]
 
             indices = indices[in_range_indices]   
@@ -325,7 +332,7 @@ class ObjectLocalizer:
         in_BB_indices, center_ind, center = self.points_in_BB(index)
 
         # If no points falls inside the BB
-        if center_ind == NO_POSE :
+        if center_ind == NO_POSE or len(in_BB_indices) < self.min_cluster_size :
             if self.distance_estimator_type == "none":
                 new_obj.pt_indices      = np.array([NO_POSE])
                 new_obj.pos             = np.array([0,0, NO_POSE])
@@ -343,8 +350,12 @@ class ObjectLocalizer:
             # in_BB_2D = self.points2D[in_BB_indices, :]
             
             if self.model_method == "hdbscan":
-
-                estimated_dist = self.distance_estimator([index, obj_class])
+                try:
+                    estimated_dist = self.distance_estimator([index, obj_class])
+                except:
+                    msg = "[ObjectLocalizer] Estimation failed. There is no data for the object " + obj_class + " !"
+                    rospy.logwarn(msg)
+                    estimated_dist = 0
                 pos, on_object = self.method_hdbscan_closeness(in_BB_3D, obj_class, estimated_dist)
 
             elif self.model_method == "mean":
@@ -353,7 +364,7 @@ class ObjectLocalizer:
             elif self.model_method == "median":
                 on_object = np.arange(0,in_BB_3D.shape[0])
                 pos = np.median(in_BB_3D, axis=0)
-            elif self.model_method == "centre":
+            elif self.model_method == "center":
                 on_object = np.arange(0,in_BB_3D.shape[0])
                 pos = in_BB_3D[center_ind,:]
             elif self.model_method == "histogram":

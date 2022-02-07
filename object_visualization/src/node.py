@@ -22,6 +22,7 @@ class Node:
         self.object_topic                   = rospy.get_param('~object_topic', '/objects')
         self.image_pub_topic                = rospy.get_param('~out_image_pub_topic', "/versavis/cam0/objects")
         self.marker_pub_topic               = rospy.get_param('~marker_pub_topic', "/objects/markers")
+        self.only_BB                        = rospy.get_param('~only_BB', False)
         self.visualize_all                  = rospy.get_param('~visualize_all', False)
         self.map_frame                      = rospy.get_param('~map_frame', 'map')
 
@@ -39,30 +40,33 @@ class Node:
         point_cloud_2D = ros_numpy.point_cloud2.pointcloud2_to_xyz_array(detection.pointcloud_in_frame_2D)
         point_cloud_3D = ros_numpy.point_cloud2.pointcloud2_to_xyz_array(detection.pointcloud_in_frame_3D)
         objects = detection.detections
-
-        if self.visualize_all:
-            for idx, pt in enumerate(point_cloud_2D): 
-                dist = point_cloud_3D[idx, 2]
-                color = depth_color(dist, min_d=0.2, max_d=20)
-                try:
-                    cv2.circle(img, pt[:2].astype(np.int32), 1, color)
-                except:
-                    print("Cannot Circle")
-        else:
-            for idx, object in enumerate(objects):
-                on_obj_indices = np.array(object.on_object_point_indices)
-                # No pose estimation for the object
-                # No points fall into Bounding Box
-                if on_obj_indices[0] == NO_POSE:
-                    continue
-
-                obj_class = object.class_id
-                for idx, pt in enumerate(point_cloud_2D[on_obj_indices,:]): 
+        
+        if not self.only_BB:
+            if self.visualize_all:
+                for idx, pt in enumerate(point_cloud_2D): 
                     dist = point_cloud_3D[idx, 2]
+                    color = depth_color(dist, min_d=0.5, max_d=30)
                     try:
-                        cv2.circle(img, pt[:2].astype(np.int32), 1, CLASS_COLOR[obj_class])
+                        cv2.circle(img, pt[:2].astype(np.int32), 3, color, -1)
                     except:
                         print("Cannot Circle \n")
+            else:
+                for idx, object in enumerate(objects):
+                    on_obj_indices = np.array(object.on_object_point_indices)
+                    # No pose estimation for the object
+                    # No points fall into Bounding Box
+                    if on_obj_indices[0] == NO_POSE:
+                        continue
+
+                    obj_class = object.class_id
+                    for idx, pt in enumerate(point_cloud_2D[on_obj_indices,:]):
+                        # dist = np.linalg.norm( point_cloud_3D[idx] )
+                        # color = depth_color(dist, min_d=0.5, max_d=20)
+                        try:
+                            cv2.circle(img, pt[:2].astype(np.int32), 2, CLASS_COLOR[obj_class], -1 )
+                            # cv2.circle(img, pt[:2].astype(np.int32), 2, color, -1 )
+                        except:
+                            print("Cannot Circle \n")
         
         img_msg = self.cv_bridge.cv2_to_imgmsg(img, 'bgr8')
         img_msg.header.frame_id = detection.header.frame_id
@@ -98,6 +102,10 @@ class Node:
                                     transform.transform.translation.z ])
             color = np.flip(np.array(CLASS_COLOR[obj_class]) / 255.0)
             markers.markers.append(marker_(obj_class + str(obj_id), obj_id, obj_in_map, detection.header.stamp, color, self.map_frame))
+            
+            input = str(transform.transform.translation.x) + " " + str(transform.transform.translation.y) + " " + str(transform.transform.translation.z ) + "\n"
+            with open( '/home/oilter/Courses/SemesterProject/catkin_ws/src/object_visualization/result.txt', 'a' ) as file:
+                file.write(input)
 
         self.marker_pub.publish(markers)  
 

@@ -1,7 +1,7 @@
 <launch>
 
-  <arg name="rosbag_name" default="bike_5_smb"/>
-  <arg name="rosbag_path" default="/home/oilter/Downloads/$(arg rosbag_name).bag"/>
+  <arg name="rosbag_name" default="clock_5_smb"/>
+  <arg name="rosbag_path" default="/media/oilter/D4561E4E561E31AA/SemesterProject/Y2022-01-31/$(arg rosbag_name).bag"/>
 
   <arg name="camera_calib_path" default="$(find object_detection)/cfg/smb264_camera_model.yaml"/>
 
@@ -9,7 +9,7 @@
   <arg name="input_camera_name" default="/versavis/cam0" />
   <arg name="lidar_topic" default='/rslidar_points'/>
 
-  <arg name="object_detection_classes" default="[1]"/>
+  <arg name="object_detection_classes" default="[74]"/>
 
   <!--Debayer the image-->
   <node pkg="image_proc" type="image_proc" name="debayer" ns="$(arg input_camera_name)/" />
@@ -42,7 +42,7 @@
 
     <!--Camera Lidar synchronization related-->
     <param name="camera_lidar_sync_queue_size" value="10"/>
-    <param name="camera_lidar_sync_slop" value="0.05"/>
+    <param name="camera_lidar_sync_slop" value="0.1"/>
 
     <!--Config files-->
     <param name="config_dir" value='$(find object_detection)/cfg/'/>
@@ -56,15 +56,15 @@
     <param name="device" value='cpu'/>
     <param name="confident" value='0.4'/>
     <param name="iou" value='0.1'/>
-    <rosparam param="classes" subst_value="True">$(arg object_detection_classes)</rosparam>
+    <rosparam param="classes" subst_value="True">$(arg object_detection_classes)</rosparam> >
     <param name="multiple_instance" value='False'/>
 
     <!--Object localization related-->
     <param name="model_method" value='hdbscan'/>
     <param name="ground_percentage" value='0.6'/>
-    <param name="bb_contract_percentage" value='0.0'/>
+    <param name="bb_contract_percentage" value='10.0'/>
     <param name="distance_estimator_type" value='bb2dist'/>
-    <param name="distance_estimator_save_data" value='True'/>
+    <param name="distance_estimator_save_data" value='False'/>
 
     
 
@@ -72,8 +72,10 @@
 
   <include file="$(find object_visualization)/launch/object_visualization.launch">
     <arg name="object_topic" value="/objects"/>
+    <arg name="visualize_all" value='False'/>
+    <arg name="only_BB" value='False'/>
   </include>
 
-  <node pkg="rosbag" type="play" name="player" output="screen" args="-d 3 -s 0 -r 0.4 $(arg rosbag_path)" required = "false"/>
+  <node pkg="rosbag" type="play" name="player" output="screen" args="-d 3 -s 0 -r 0.2 $(arg rosbag_path)" required = "false"/>
 
 </launch>

@@ -72,7 +72,7 @@ class Node:
             "confident"         :  rospy.get_param('~confident', '0.4'),
             "iou"               :  rospy.get_param('~iou', '0.1'),
             "checkpoint"        :  rospy.get_param('~checkpoint', None),
-            "classes"           :  rospy.get_param('~classes', [0, 1]),
+            "classes"           :  rospy.get_param('~classes', None),
             "multiple_instance" :  rospy.get_param('~multiple_instance', False)
         }
 
@@ -85,7 +85,7 @@ class Node:
             "distance_estimator_save_data"  :  rospy.get_param('~distance_estimator_save_data', 'False'),
             "object_specific_file"          :  rospy.get_param('~object_specific_file', 'object_specific.yaml'),
             "min_cluster_size"              :  rospy.get_param('~min_cluster_size', 5),
-            "cluster_selection_epsilon"     :  rospy.get_param('~cluster_selection_epsilon', 0.02),
+            "cluster_selection_epsilon"     :  rospy.get_param('~cluster_selection_epsilon', 0.08),
         }
 
         # ---------- Objects of Actions ----------
@@ -96,6 +96,8 @@ class Node:
         
         rospy.loginfo("[ObjectDetection Node] Object Detector initilization done.")
         rospy.loginfo("[ObjectDetection Node] Waiting for image info ...")
+
+        self.number_of_loop = 0
     
 
     def image_info_callback(self, camera_info):
@@ -130,6 +132,7 @@ class Node:
                 rospy.logfatal("[ObjectDetection Node] Lidar message is empty. Object detecion is on hold.")
 
             if self.image_info_recieved and image_msg.height > 0 and lidar_msg.width > 0:
+                self.number_of_loop += 1
                 
                 # Read lidar message
                 point_cloud_XYZ = pointcloud2_to_xyzi(lidar_msg)
@@ -181,8 +184,8 @@ class Node:
                         object_detection.bounding_box_max_x = int(object_detection_result['xmax'][i])
                         object_detection.bounding_box_max_y = int(object_detection_result['ymax'][i])
 
-                        object_detection.on_object_point_indices = list(object_list[i].pt_indices) # if type(object_list[i].pt_indices) == 'numpy.ndarray' else list(np.array([object_list[i].pt_indices]))
-
+                        object_detection.on_object_point_indices = list(object_list[i].pt_indices) 
+                        
                     object_detection_array.detections.append(object_detection)
             
                 if self.verbose:
@@ -208,5 +211,7 @@ if __name__ == '__main__':
     node = Node()
     rospy.loginfo("[ObjectDetection Node] Detection has started")
     node.run()
+    msg = "loop count: " + str(node.number_of_loop)
+    rospy.loginfo(msg)
 
     
