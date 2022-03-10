@@ -16,8 +16,6 @@ from object_detection.pointprojector    import PointProjector
 from object_detection.objectlocalizer   import ObjectLocalizer
 from object_detection.utils             import pointcloud2_to_xyzi, check_validity_image_info, filter_ground
 
-
-
 import warnings
 warnings.filterwarnings("ignore")
 
@@ -79,9 +77,9 @@ class Node:
         # ---------- 3D Object Localizer Related ----------
         self.objectlocalizer_cfg = {
             "model_method"                  :  rospy.get_param('~model_method', 'hdbscan'),
-            "ground_percentage"             :  rospy.get_param('~ground_percentage', 0.6),
-            "bb_contract_percentage"        :  rospy.get_param('~bb_contract_percentage', 0.0),
-            "distance_estimator_type"       :  rospy.get_param('~distance_estimator_type', 'bb2dist'),
+            "ground_percentage"             :  rospy.get_param('~ground_percentage', 25),
+            "bb_contract_percentage"        :  rospy.get_param('~bb_contract_percentage', 10),
+            "distance_estimator_type"       :  rospy.get_param('~distance_estimator_type', 'none'),
             "distance_estimator_save_data"  :  rospy.get_param('~distance_estimator_save_data', 'False'),
             "object_specific_file"          :  rospy.get_param('~object_specific_file', 'object_specific.yaml'),
             "min_cluster_size"              :  rospy.get_param('~min_cluster_size', 5),
@@ -96,9 +94,6 @@ class Node:
         
         rospy.loginfo("[ObjectDetection Node] Object Detector initilization done.")
         rospy.loginfo("[ObjectDetection Node] Waiting for image info ...")
-
-        self.number_of_loop = 0
-    
 
     def image_info_callback(self, camera_info):
         self.optical_frame_id  = camera_info.header.frame_id
@@ -116,8 +111,8 @@ class Node:
             self.image_info_recieved = True
             self.camera_info_sub.unregister()
         else:
-            if self.seq > 10:
-                rospy.logerr("[ObjectDetection Node] Image info could not be set after 10th try! Please check image info!")
+            if self.seq > 20:
+                rospy.logerr("[ObjectDetection Node] Image info could not be set after 20th try! Please check image info!")
                 rospy.signal_shutdown("Image info missing!")
             rospy.loginfo("[ObjectDetection Node] Image info is not set! Trying again after 1 sec!")
             rospy.sleep(1)
@@ -132,7 +127,6 @@ class Node:
                 rospy.logfatal("[ObjectDetection Node] Lidar message is empty. Object detecion is on hold.")
 
             if self.image_info_recieved and image_msg.height > 0 and lidar_msg.width > 0:
-                self.number_of_loop += 1
                 
                 # Read lidar message
                 point_cloud_XYZ = pointcloud2_to_xyzi(lidar_msg)
@@ -211,7 +205,4 @@ if __name__ == '__main__':
     node = Node()
     rospy.loginfo("[ObjectDetection Node] Detection has started")
     node.run()
-    msg = "loop count: " + str(node.number_of_loop)
-    rospy.loginfo(msg)
-
     

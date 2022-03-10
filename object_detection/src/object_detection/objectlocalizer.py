@@ -8,14 +8,14 @@ from scipy.signal import find_peaks
 
 from dataclasses import dataclass
 
-# TODO: Handle better minus bb2dist prediction
-
 NO_POSE     = -1
 MAX_DIST    = 999999
 
 AXIS_X = 0
 AXIS_Y = 1
 AXIS_Z = 2
+
+DEFAULT_MAX_OBJECT_DEPTH = 0.25
 
 @dataclass
 class DetectedObject:
@@ -29,10 +29,12 @@ class DetectedObject:
 class ObjectLocalizer:
     def __init__(self, config, config_dir):
 
-        self.object_specific_file_dir   = os.path.join(config_dir, config["object_specific_file"])
-        
-        with open(self.object_specific_file_dir) as file:
-            self.obj_conf               = yaml.load(file, Loader=yaml.FullLoader)
+        try:
+            self.object_specific_file_dir   = os.path.join(config_dir, config["object_specific_file"])
+            with open(self.object_specific_file_dir) as file:
+                self.obj_conf               = yaml.load(file, Loader=yaml.FullLoader)
+        except:
+            rospy.loginfo("[objectlocalizer] Object specific file or path does not exist. It is fine if you are using version 1.")
 
         self.model_method                   = config["model_method"].lower()
         self.distance_estimator_type        = config["distance_estimator_type"].lower()
@@ -43,7 +45,6 @@ class ObjectLocalizer:
         
         self.distance_estimator             = self.estimate_dist_default
         
-
         if self.distance_estimator_type  != "none":
             
             try:
@@ -230,7 +231,7 @@ class ObjectLocalizer:
 
         return inside_BB, center_ind, center
 
-    def method_hdbscan_closeness(self,in_BB_3D, obj_class, estimated_dist):
+    def method_hdbscan(self,in_BB_3D, obj_class, estimated_dist):
         
         cluster = hdbscan.HDBSCAN(min_cluster_size=self.min_cluster_size , \
                                   cluster_selection_epsilon=self.cluster_selection_epsilon).fit(in_BB_3D[:,[AXIS_X, AXIS_Z]])
@@ -257,15 +258,8 @@ class ObjectLocalizer:
         
         else:  
 
-            try:
-                max_depth = self.obj_conf[obj_class]["max_depth"]
-            except:
-                max_depth = 10
-
-
             distances = np.squeeze(in_BB_3D[indices, AXIS_Z])
-            in_range_indices = np.nonzero( ( np.abs(distances - estimated_dist) - min( np.abs(distances - estimated_dist) ) ) < max_depth )[0]
-            # in_range_indices = np.nonzero( np.abs( min(distances) - distances ) < self.obj_conf[obj_class]["max_depth"] / 2.0 )[0]
+            in_range_indices = np.nonzero( ( np.abs(distances - estimated_dist) - min( np.abs(distances - estimated_dist) ) ) < DEFAULT_MAX_OBJECT_DEPTH )[0]
 
             indices = indices[in_range_indices]   
             avg =  np.mean(in_BB_3D[indices], axis=0)
@@ -356,7 +350,7 @@ class ObjectLocalizer:
                     msg = "[ObjectLocalizer] Estimation failed. There is no data for the object " + obj_class + " !"
                     rospy.logwarn(msg)
                     estimated_dist = 0
-                pos, on_object = self.method_hdbscan_closeness(in_BB_3D, obj_class, estimated_dist)
+                pos, on_object = self.method_hdbscan(in_BB_3D, obj_class, estimated_dist)
 
             elif self.model_method == "mean":
                 on_object = np.arange(0,in_BB_3D.shape[0])

@@ -13,10 +13,10 @@ def filter_ground(point3D, ground_percentage, upward = Z_UPWARDS):
     """
 
     if upward < 0:
-        indices = np.nonzero(point3D[:,-upward] < max(point3D[:,-upward])*ground_percentage)[0]
+        indices = np.nonzero(point3D[:,-upward] < max(point3D[:,-upward])*(100-ground_percentage)/100)[0]
         
     else:
-        indices = np.nonzero(point3D[:,upward] > min(point3D[:,upward])*ground_percentage)[0]
+        indices = np.nonzero(point3D[:,upward] > min(point3D[:,upward])*(100-ground_percentage)/100)[0]
     
     return point3D[indices]
 

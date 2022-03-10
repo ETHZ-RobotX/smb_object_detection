@@ -1,7 +1,7 @@
 <launch>
 
-  <arg name="rosbag_name" default="bike_bottle_person_52_smb"/>
-  <arg name="rosbag_path" default="/media/oilter/D4561E4E561E31AA/SemesterProject/2021-12-06/$(arg rosbag_name).bag"/>
+  <arg name="rosbag_name" default="bike_17_smb"/>
+  <arg name="rosbag_path" default="/media/oilter/D4561E4E561E31AA/SemesterProject/Y2022-01-31/$(arg rosbag_name).bag"/>
 
   <arg name="camera_calib_path" default="$(find object_detection)/cfg/smb264_camera_model.yaml"/>
 
@@ -9,9 +9,11 @@
   <arg name="input_camera_name" default="/versavis/cam0" />
   <arg name="lidar_topic" default='/rslidar_points'/>
 
+  <arg name="object_detection_classes" default="[1]"/>
+
   <!--Debayer the image-->
   <node pkg="image_proc" type="image_proc" name="debayer" ns="$(arg input_camera_name)/" />
-
+  
   <!--Undistored the debayered image-->
   <!--https://github.com/ethz-asl/image_undistort-->
   <node name="image_undistort_node" pkg="image_undistort" type="image_undistort_node" output="screen" clear_params="true">
@@ -28,6 +30,7 @@
 
   <!--Object detection node-->
   <node name="objectify" pkg="object_detection" type="node.py" output="screen">
+
     <!--Input related-->
     <param name="camera_topic" value='$(arg input_camera_name)/undistorted'/>
     <param name="camera_info_topic" value='$(arg input_camera_name)/camera_info'/>
@@ -35,33 +38,39 @@
 
     <!--Output related-->
     <param name="object_detection_topic" value='/objects'/>
+    <param name="verbose" value='True'/>
 
     <!--Camera Lidar synchronization related-->
     <param name="camera_lidar_sync_queue_size" value="10"/>
-    <param name="camera_lidar_sync_slop" value="0.05"/>
+    <param name="camera_lidar_sync_slop" value="0.1"/>
 
     <!--Config files-->
     <param name="config_dir" value='$(find object_detection)/cfg/'/>
 
     <!--Point Projector related-->
-    <param name="project_config" value='projector_config.yaml'/>
+    <param name="project_config" value='projector_config_SMB264.yaml'/>
 
     <!--Object detection related-->
+    <param name="architecture" value='yolo'/>
+    <param name="model" value='yolov5l6'/>
+    <param name="device" value='cpu'/>
+    <param name="confident" value='0.4'/>
+    <param name="iou" value='0.1'/>
+    <rosparam param="classes" subst_value="True">$(arg object_detection_classes)</rosparam> >
     <param name="multiple_instance" value='False'/>
-    <param name="detector_config" value='detector_config.yaml'/>
 
     <!--Object localization related-->
-    <param name="localizer_config" value='localizer_config.yaml'/>
-    <param name="objectlocalizer_save_data" value='False'/>
-    <param name="objectlocalizer_learning_type" value='bb2dist'/>
-
-
+    <param name="model_method" value='hdbscan'/>
+    <param name="ground_percentage" value='25'/>
+    <param name="bb_contract_percentage" value='10.0'/>
   </node>
 
   <include file="$(find object_visualization)/launch/object_visualization.launch">
     <arg name="object_topic" value="/objects"/>
+    <arg name="visualize_all" value='False'/>
+    <arg name="only_BB" value='False'/>
   </include>
 
-  <node pkg="rosbag" type="play" name="player" output="screen" args="-d 3 -s 0 -r 0.4 $(arg rosbag_path)" required = "false"/>
+  <node pkg="rosbag" type="play" name="player" output="screen" args="-d 3 -s 0 -r 0.2 $(arg rosbag_path)" required = "false"/>
 
 </launch>

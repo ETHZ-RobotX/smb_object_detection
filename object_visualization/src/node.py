@@ -64,7 +64,6 @@ class Node:
                         # color = depth_color(dist, min_d=0.5, max_d=20)
                         try:
                             cv2.circle(img, pt[:2].astype(np.int32), 2, CLASS_COLOR[obj_class], -1 )
-                            # cv2.circle(img, pt[:2].astype(np.int32), 2, color, -1 )
                         except:
                             print("Cannot Circle \n")
         
@@ -102,10 +101,6 @@ class Node:
                                     transform.transform.translation.z ])
             color = np.flip(np.array(CLASS_COLOR[obj_class]) / 255.0)
             markers.markers.append(marker_(obj_class + str(obj_id), obj_id, obj_in_map, detection.header.stamp, color, self.map_frame))
-            
-            input = str(transform.transform.translation.x) + " " + str(transform.transform.translation.y) + " " + str(transform.transform.translation.z ) + "\n"
-            with open( '/home/oilter/Courses/SemesterProject/catkin_ws/src/object_visualization/result.txt', 'a' ) as file:
-                file.write(input)
 
         self.marker_pub.publish(markers)  
 

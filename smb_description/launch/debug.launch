@@ -19,8 +19,7 @@
   <!-- Open Rviz or Not -->
   <arg name="visualize" default="1"/>
   <!--Rviz config Directory-->
-  <arg name="RvizConf" default="$(find map)/rviz/all_frames.rviz"/>
-
+  <arg name="RvizConf" default="$(find object_visualization)/rviz/all_frames.rviz"/>
   
   <!-- Load robot description -->
   <include file="$(find smb_description)/launch/load.launch">
