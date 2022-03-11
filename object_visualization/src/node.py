@@ -13,7 +13,6 @@ from object_visualization.msg import ObjectDetection, ObjectDetectionArray
 
 from object_visualization.utils import *
 
-
 class Node:
     def __init__(self):
 

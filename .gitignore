@@ -1,6 +1,6 @@
+# Ignore them
 *.vscode
 *.bag
-*.txt
 __pycache__/
 map/
 aprilta_ros/

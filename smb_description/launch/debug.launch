@@ -1,5 +1,6 @@
 <launch>
 
+
   <!-- Name of the robot setup -->
   <arg name="model_setup" default="smb_standalone"/>
   <!-- Give the robot description parameter a name -->

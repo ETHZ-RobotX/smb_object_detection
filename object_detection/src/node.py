@@ -180,7 +180,8 @@ class Node:
                         object_detection.on_object_point_indices = list(object_list[i].pt_indices) 
                         
                     object_detection_array.detections.append(object_detection)
-            
+
+                # only if verbose correct
                 if self.verbose:
                     # Convert arrays to correct format
                     pointcloud_on_image = np.c_[ pointcloud_on_image, np.zeros(pointcloud_on_image.shape[0]) ]
