@@ -19,7 +19,7 @@ from object_detection.utils             import pointcloud2_to_xyzi, check_validi
 import warnings
 warnings.filterwarnings("ignore")
 
-UINT32      = 2**32 - 1
+UINT32      = 2**32 - 1 # might be unnecessary
 
 class Node:
     def __init__(self):
