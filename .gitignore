@@ -1,5 +1,4 @@
 # some ignores
 *.vscode
 *.bag
-*.txt
 __pycache__/
