@@ -19,7 +19,6 @@ from object_detection.utils             import pointcloud2_to_xyzi, check_validi
 import warnings
 warnings.filterwarnings("ignore")
 
-
 UINT32      = 2**32 - 1
 
 class Node:
@@ -65,7 +64,7 @@ class Node:
         # ---------- 2D Object Detection Related ----------
         self.objectdetector_cfg = {
             "architecture"      :  rospy.get_param('~architecture', 'yolo'),
-            "model"             :  rospy.get_param('~model', 'yolov5n6'),
+            "model"             :  rospy.get_param('~model', 'yolov5n6').lower(),
             "device"            :  rospy.get_param('~device', 'cpu'),
             "confident"         :  rospy.get_param('~confident', '0.4'),
             "iou"               :  rospy.get_param('~iou', '0.1'),

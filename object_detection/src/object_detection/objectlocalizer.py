@@ -3,7 +3,6 @@ import yaml
 import rospy
 import hdbscan
 import numpy as np
-from sklearn.cluster import DBSCAN
 from scipy.signal import find_peaks
 
 from dataclasses import dataclass
@@ -265,27 +264,6 @@ class ObjectLocalizer:
             avg =  np.mean(in_BB_3D[indices], axis=0)
                              
         return avg, indices
-        
-    def method_kMeans(self,in_BB_3D):
-       
-        cluster = DBSCAN(eps=0.3, min_samples=1).fit(in_BB_3D)
-        uniq = np.unique(cluster.labels_)
-
-        min_val = 100000
-        indices = None
-
-        for i in uniq:
-            indices_ = np.squeeze(np.argwhere(cluster.labels_ == i))
-            min_val_ = np.mean(np.linalg.norm(in_BB_3D[indices_], axis=1))
-
-            if min_val_ < min_val:
-                indices = indices_
-                min_val = min_val_
-
-        if len(indices) > 1:
-            return np.mean(in_BB_3D[indices],axis=0), indices
-        else:
-            return in_BB_3D[indices], indices
 
     def method_histogram(self,in_BB_3D, method = "distance", bins=100):
 

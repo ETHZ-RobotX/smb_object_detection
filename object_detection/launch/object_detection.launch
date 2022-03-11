@@ -6,7 +6,7 @@
   <arg name="input_camera_name" default="/versavis/cam0" />
   <arg name="lidar_topic" default='/rslidar_points'/>
 
-  <arg name="object_detection_classes" default="[1]"/>
+  <arg name="object_detection_classes" default="[0]"/>
 
   <!--Debayer the image-->
   <node pkg="image_proc" type="image_proc" name="debayer" ns="$(arg input_camera_name)/" />
@@ -35,7 +35,7 @@
 
     <!--Output related-->
     <param name="object_detection_topic" value='/objects'/>
-    <param name="verbose" value='True'/>
+    <param name="verbose" value='False'/>
 
     <!--Camera Lidar synchronization related-->
     <param name="camera_lidar_sync_queue_size" value="10"/>
@@ -48,8 +48,7 @@
     <param name="project_config" value='projector_config_SMB264.yaml'/>
 
     <!--Object detection related-->
-    <param name="architecture" value='yolo'/>
-    <param name="model" value='yolov5l6'/>
+    <param name="model" value='yoLov5l6'/>
     <param name="device" value='cpu'/>
     <param name="confident" value='0.4'/>
     <param name="iou" value='0.1'/>

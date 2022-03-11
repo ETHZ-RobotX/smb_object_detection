@@ -51,7 +51,6 @@
     <param name="project_config" value='projector_config_SMB264.yaml'/>
 
     <!--Object detection related-->
-    <param name="architecture" value='yolo'/>
     <param name="model" value='yolov5l6'/>
     <param name="device" value='cpu'/>
     <param name="confident" value='0.4'/>
@@ -64,6 +63,8 @@
     <param name="ground_percentage" value='25'/>
     <param name="bb_contract_percentage" value='10.0'/>
   </node>
+
+
 
   <include file="$(find object_visualization)/launch/object_visualization.launch">
     <arg name="object_topic" value="/objects"/>

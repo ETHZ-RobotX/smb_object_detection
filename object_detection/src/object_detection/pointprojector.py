@@ -1,10 +1,8 @@
 import yaml
 import rospy
-from PIL.Image import FASTOCTREE
 import numpy as np
 
 from object_detection.utils import check_validity_lidar2camera_transformation
-
 
 AXIS_X = 0
 AXIS_Y = 1
