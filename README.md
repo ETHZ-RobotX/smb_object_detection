@@ -38,4 +38,4 @@ Detections will be published in the optical frame, which is a parameter to the s
 
 
 ## Extra Package: Object Visualization
-This package has only one script that shows how the object detection output should be used. This package can be also used to visualize the detections on image and also on the map frame with markers.
+This package has only one script that  shows how the object detection output should be used. This package can be also used to visualize the detections on image and also on the map frame with markers.
