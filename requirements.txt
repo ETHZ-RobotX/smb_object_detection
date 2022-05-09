@@ -27,7 +27,7 @@ rospy
 ros_numpy
 cv_bridge
 hdbscan
-scipy
+# scipy
 # yaml
 
 
