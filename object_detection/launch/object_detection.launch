@@ -4,6 +4,7 @@
 
   <arg name="optical_frame_name" default='blackfly_right_optical_link'/>
   <arg name="input_camera_name" default="/versavis/cam0" />
+  <!-- <arg name="input_camera_name" default="/mono/cam0/" /> -->
   <arg name="lidar_topic" default='/rslidar_points'/>
 
   <arg name="object_detection_classes" default="[0]"/>
@@ -61,10 +62,10 @@
     <param name="bb_contract_percentage" value='10.0'/>
   </node>
 
-  <include file="$(find object_visualization)/launch/object_visualization.launch">
+  <!-- <include file="$(find object_visualization)/launch/object_visualization.launch">
     <arg name="object_topic" value="/objects"/>
     <arg name="visualize_all" value='False'/>
     <arg name="only_BB" value='False'/>
-  </include>
+  </include> -->
 
 </launch>

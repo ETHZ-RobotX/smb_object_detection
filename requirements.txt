@@ -28,7 +28,7 @@ ros_numpy
 cv_bridge
 hdbscan
 scipy
-yaml
+# yaml
 
 
 thop  # FLOPs computation
