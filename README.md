@@ -4,9 +4,14 @@ Detection and mapping of objects with camera and lidar.
 The main branch contains the necessary packages to run the pipeline with the packages of SMB. The branch `stand_alone` can run rosbags and visualize them without needing any additional package. 
 
 ## Install
-The full pipeline has been written with Python3. The necessary libraries can be found in requirements.txt . They should be installed in an environment which can be reached by ROS. 
+The full pipeline has been written with Python3. The necessary libraries can be found in `requirements.txt`. They should be installed in an environment which can be reached by ROS. Furthermore, make sure that all ros package dependencies are met.
 
+In the source directory of object_detection, execute:
+
+```
+rosdep install --from-paths . --ignore-src --os=ubuntu:focal -r -y
 pip install -r requirements.txt
+```
 
 ## Start Multimodal Object Detection and Mapping
 Adapt the smb name in the launch file below to the correct SMB number and run to start the object mapping node.
