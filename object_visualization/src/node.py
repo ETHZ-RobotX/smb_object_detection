@@ -9,7 +9,7 @@ from cv_bridge import CvBridge
 from sensor_msgs.msg import Image
 from geometry_msgs.msg import Pose, TransformStamped
 from visualization_msgs.msg import Marker, MarkerArray
-from object_visualization.msg import ObjectDetection, ObjectDetectionArray
+from object_detection_msgs.msg import ObjectDetection, ObjectDetectionArray
 
 from object_visualization.utils import *
 

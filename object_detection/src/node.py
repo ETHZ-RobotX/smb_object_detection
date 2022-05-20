@@ -9,7 +9,7 @@ import message_filters as mf
 from cv_bridge import CvBridge
 from sensor_msgs.msg import Image, PointCloud2, CameraInfo
 
-from object_detection.msg import ObjectDetection, ObjectDetectionArray
+from object_detection_msgs.msg import ObjectDetection, ObjectDetectionArray
 
 from object_detection.objectdetector    import ObjectDetector
 from object_detection.pointprojector    import PointProjector
