@@ -93,7 +93,11 @@ class Node:
         
         rospy.loginfo("[ObjectDetection Node] Object Detector initilization done.")
         rospy.loginfo("[ObjectDetection Node] Waiting for image info ...")
+        camera_info = rospy.wait_for_message(self.camera_info_topic , CameraInfo, timeout=10)
+        self.image_info_callback(camera_info)
 
+    # MAK note: I am actually fairly confused about what this function does.
+    # It seems to be something used only for initialisation, thus I really do not think that having a dedicated subscriber makes much sense.
     def image_info_callback(self, camera_info):
         self.optical_frame_id  = camera_info.header.frame_id
         h                      = camera_info.height
@@ -105,16 +109,18 @@ class Node:
             self.pointprojector.set_intrinsic_params(K, [w,h])
             self.objectlocalizer.set_intrinsic_camera_param(K)
             rospy.loginfo("[ObjectDetection Node] Image info is set! Detection is starting in 1 sec!")
-            rospy.sleep(1)
+            rospy.sleep(1) # again, sleeping like 
             self.seq = 0
             self.image_info_recieved = True
-            self.camera_info_sub.unregister()
+            # self.camera_info_sub.unregister()
         else:
-            if self.seq > 20:
-                rospy.logerr("[ObjectDetection Node] Image info could not be set after 20th try! Please check image info!")
-                rospy.signal_shutdown("Image info missing!")
-            rospy.loginfo("[ObjectDetection Node] Image info is not set! Trying again after 1 sec!")
-            rospy.sleep(1)
+            # if self.seq > 20:
+            #     rospy.logerr("[ObjectDetection Node] Image info could not be set after 20th try! Please check image info!")
+            #     rospy.signal_shutdown("Image info missing!")
+            # rospy.loginfo("[ObjectDetection Node] Image info is not set! Trying again after 1 sec!")
+            # rospy.sleep(1) # this seems not smart, sleeping inside a callback.
+            # the problem seems to be that two nodes publish to the camera_info topic.
+            rospy.logerr("camera_info not valid")
 
     def run(self):
 
@@ -195,7 +201,7 @@ class Node:
                 # Publish the message
                 self.object_detection_pub.publish(object_detection_array)
 
-        self.camera_info_sub = rospy.Subscriber(self.camera_info_topic , CameraInfo, self.image_info_callback)
+        # self.camera_info_sub = rospy.Subscriber(self.camera_info_topic , CameraInfo, self.image_info_callback)
         self.synchronizer.registerCallback(callback)
 
         rospy.spin()
