@@ -207,8 +207,8 @@ class Node:
         rospy.spin()
 
 if __name__ == '__main__':
-
     node = Node()
     rospy.loginfo("[ObjectDetection Node] Detection has started")
     node.run()
     
+# change the queue sizes
