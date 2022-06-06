@@ -1,0 +1,72 @@
+<launch>
+
+  <arg name="rosbag_name" default="2021-06-30-10-00-21_smb_artefact"/>
+  <arg name="rosbag_path" default="/home/mads/workspaces/RSS_ws/bags/$(arg rosbag_name).bag"/>
+
+  <arg name="camera_calib_path" default="$(find object_detection)/cfg/smb264_camera_model.yaml"/>
+
+  <arg name="optical_frame_name" default='blackfly_right_optical_link'/>
+  <arg name="input_camera_name" default="/versavis/cam0" />
+  <arg name="undistorted_image_name" default="$(arg input_camera_name)/undistort" />
+  <arg name="lidar_topic" default='/rslidar_points'/>
+
+  <arg name="object_detection_classes" default="[0,1,11,25,13,74]"/>
+
+  <param name ="use_sim_time" value="true"/>
+  <!--Debayer the image-->
+  <!-- <node pkg="image_proc" type="image_proc" name="debayer" ns="$(arg input_camera_name)/" /> -->
+
+  <node pkg="nodelet" type="nodelet" name="debayer"
+        args="standalone image_proc/debayer">
+    <remap from="image_raw" to="$(arg input_camera_name)/image_raw" />
+    <remap from="image_color" to="$(arg input_camera_name)/image_color" />
+    <remap from="image_mono" to="$(arg input_camera_name)/image_mono" />
+  </node>
+
+  <!--Object detection node-->
+  <node name="objectify" pkg="object_detection" type="node.py" output="screen">
+
+    <!--Input related-->
+    <!-- <param name="camera_topic" value='$(arg undistorted_image_name)/image'/> -->
+    <param name="camera_topic" value='$(arg input_camera_name)/image_color'/>
+    <param name="camera_info_topic" value='$(arg input_camera_name)/camera_info'/>
+    <!-- <param name="camera_info_topic" value='$(arg input_camera_name)/camera_info'/> -->
+    <param name="lidar_topic" value='$(arg lidar_topic)'/>
+
+    <!--Output related-->
+    <param name="object_detection_topic" value='/objects'/>
+    <param name="verbose" value='True'/>
+
+    <!--Camera Lidar synchronization related-->
+    <param name="camera_lidar_sync_queue_size" value="10"/>
+    <param name="camera_lidar_sync_slop" value="0.1"/>
+
+    <!--Config files-->
+    <param name="config_dir" value='$(find object_detection)/cfg/'/>
+
+    <!--Point Projector related-->
+    <param name="project_config" value='projector_config_SMB264.yaml'/>
+
+    <!--Object detection related-->
+    <param name="model" value='yolov5l6'/>
+    <param name="device" value='cpu'/>
+    <param name="confident" value='0.4'/>
+    <param name="iou" value='0.1'/>
+    <rosparam param="classes" subst_value="True">$(arg object_detection_classes)</rosparam> >
+    <param name="multiple_instance" value='False'/>
+
+    <!--Object localization related-->
+    <param name="model_method" value='hdbscan'/>
+    <param name="ground_percentage" value='25'/>
+    <param name="bb_contract_percentage" value='10.0'/>
+  </node>
+
+  <include file="$(find object_visualization)/launch/object_visualization.launch">
+    <arg name="object_topic" value="/objects"/>
+    <arg name="visualize_all" value='False'/>
+    <arg name="only_BB" value='False'/>
+  </include>
+
+  <node pkg="rosbag" type="play" name="player" output="screen" args="-d 3 -s 20 -r 0.5 --clock $(arg rosbag_path)" required = "false"/>
+
+</launch>

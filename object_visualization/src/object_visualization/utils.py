@@ -5,11 +5,12 @@ from visualization_msgs.msg import Marker
 
 NO_POSE = -1
 
-CLASS_COLOR = {'person'  : (255,0,0),
-               'bicycle' : (0,255,0),
-               'umbrella': (0,0,255),
-               'bottle' : (125,125,0),
-               'clock' : (0,125,125)}
+CLASS_COLOR = { 'person'  : (255,0,0),
+                'bicycle' : (0,255,0),
+                'umbrella': (0,0,255),
+                'bottle' : (125,125,0),
+                'clock' : (0,125,125),
+                'bench' : (125,0,125)}
 
 def marker_(ns, marker_id, pos, stamp ,color, frame_id = "map"):
     

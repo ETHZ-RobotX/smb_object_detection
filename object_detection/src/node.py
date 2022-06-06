@@ -120,7 +120,7 @@ class Node:
             # rospy.loginfo("[ObjectDetection Node] Image info is not set! Trying again after 1 sec!")
             # rospy.sleep(1) # this seems not smart, sleeping inside a callback.
             # the problem seems to be that two nodes publish to the camera_info topic.
-            rospy.logerr("camera_info not valid")
+            rospy.logerr(" ------------------ camera_info not valid ------------------------")
 
     def run(self):
 
