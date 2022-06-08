@@ -9,9 +9,11 @@ from cv_bridge import CvBridge
 from sensor_msgs.msg import Image
 from geometry_msgs.msg import Pose, TransformStamped
 from visualization_msgs.msg import Marker, MarkerArray
-from object_visualization.msg import ObjectDetection, ObjectDetectionArray
+from object_visualization.msg import ObjectDetection, ObjectDetectionArray      
 
 from object_visualization.utils import *
+
+import time
 
 
 # Might not work smoothly it is example code 
@@ -28,13 +30,13 @@ class Node:
         self.visualize_all                  = rospy.get_param('~visualize_all', False)
         self.map_frame                      = rospy.get_param('~map_frame', 'map')
 
-        self.tf_buffer                      = tf2_ros.Buffer(rospy.Duration(20.0)) #tf buffer length
+        self.tf_buffer                      = tf2_ros.Buffer() #tf buffer length
         self.tf_listener                    = tf2_ros.TransformListener(self.tf_buffer)
         self.TF_br                          = tf2_ros.StaticTransformBroadcaster()
         self.cv_bridge                      = CvBridge()
 
-        self.marker_pub                     = rospy.Publisher(self.marker_pub_topic , MarkerArray, queue_size=10)
-        self.image_pub                      = rospy.Publisher(self.image_pub_topic , Image, queue_size=5)
+        self.marker_pub                     = rospy.Publisher(self.marker_pub_topic , MarkerArray, queue_size=1)
+        self.image_pub                      = rospy.Publisher(self.image_pub_topic , Image, queue_size=1)
 
 
     def object_callback(self, detection):
@@ -42,7 +44,6 @@ class Node:
         point_cloud_2D = ros_numpy.point_cloud2.pointcloud2_to_xyz_array(detection.pointcloud_in_frame_2D)
         point_cloud_3D = ros_numpy.point_cloud2.pointcloud2_to_xyz_array(detection.pointcloud_in_frame_3D)
         objects = detection.detections
-        
         if not self.only_BB:
             if self.visualize_all:
                 for idx, pt in enumerate(point_cloud_2D): 
@@ -68,7 +69,7 @@ class Node:
                             cv2.circle(img, pt[:2].astype(np.int32), 2, CLASS_COLOR[obj_class], -1 )
                         except:
                             print("Cannot Circle \n")
-        
+
         img_msg = self.cv_bridge.cv2_to_imgmsg(img, 'bgr8')
         img_msg.header.frame_id = detection.header.frame_id
         self.image_pub.publish(img_msg)
@@ -86,27 +87,35 @@ class Node:
             obj_id = object.id
 
             xyz = [object.pose.x, object.pose.y, object.pose.z]
-
-            self.TF_br.sendTransform(transformstamped_(detection.header.frame_id, obj_class + str(obj_id), \
-                                                       detection.header.stamp, xyz, [0,0,0,1]))
-            
             try:
-                transform = self.tf_buffer.lookup_transform_full(self.map_frame, detection.header.stamp, \
-                                                                obj_class + str(obj_id), detection.header.stamp, \
-                                                                self.map_frame, rospy.Duration(20.0))
+                transform = self.tf_buffer.lookup_transform(self.map_frame, detection.header.frame_id, detection.header.stamp,rospy.Duration(1.0))
             except:
                 print("cannot transform \n")
                 continue
-
-            obj_in_map = np.array([transform.transform.translation.x, \
-                                    transform.transform.translation.y, \
-                                    transform.transform.translation.z ])
+            transform = ros_numpy.numpify(transform.transform)
+            pt_in_map_frame = np.matmul(transform, np.array(xyz + [1]))
+            pt_in_map_frame = pt_in_map_frame[:3]
             color = np.flip(np.array(CLASS_COLOR[obj_class]) / 255.0)
-            markers.markers.append(marker_(obj_class + str(obj_id), obj_id, obj_in_map, detection.header.stamp, color, self.map_frame))
+            markers.markers.append(marker_(obj_class + str(obj_id), obj_id, pt_in_map_frame, detection.header.stamp, color, self.map_frame))
+            self.marker_pub.publish(markers)  
 
-        self.marker_pub.publish(markers)  
+            # this transform really does nothing else than the markers.
+            self.TF_br.sendTransform(transformstamped_(self.map_frame, obj_class + str(obj_id), \
+                                                       detection.header.stamp, pt_in_map_frame, [0,0,0,1]))
+        #     try:
+        #         transform = self.tf_buffer.lookup_transform_full(self.map_frame, detection.header.stamp, \
+        #                                                         obj_class + str(obj_id), detection.header.stamp, \
+        #                                                         self.map_frame, rospy.Duration(20.0))
+        #     except:
+        #         print("cannot transform \n")
+        #         continue
 
-
+        #     obj_in_map = np.array([transform.transform.translation.x, \
+        #                             transform.transform.translation.y, \
+        #                             transform.transform.translation.z ])
+        #     color = np.flip(np.array(CLASS_COLOR[obj_class]) / 255.0)
+        #     markers.markers.append(marker_(obj_class + str(obj_id), obj_id, obj_in_map, detection.header.stamp, color, self.map_frame))
+        # self.marker_pub.publish(markers)  
     def run(self):
         self.tag_sub    = rospy.Subscriber(self.object_topic, ObjectDetectionArray, self.object_callback)
 

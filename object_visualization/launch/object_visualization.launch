@@ -1,11 +1,5 @@
 <launch>
 
-  <param name="use_sim_time" value="false"/>
-
-  <include file="$(find smb_description)/launch/debug.launch">
-    <!--<arg name="visualize" value="1"/>-->
-  </include>
-
   <arg name="object_topic" default='/objects'/>
   <arg name="visualize_all" default='False'/>
   <arg name="only_BB" default='True'/>

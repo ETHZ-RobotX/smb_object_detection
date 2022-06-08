@@ -1,7 +1,7 @@
 <launch>
 
-  <arg name="rosbag_name" default="2021-06-30-10-00-21_smb_artefact"/>
-  <arg name="rosbag_path" default="/home/mads/workspaces/RSS_ws/bags/$(arg rosbag_name).bag"/>
+  <arg name="rosbag_name" default="smb_2022-06-03-14-41-30_smb"/>
+  <arg name="rosbag_path" default="/home/mads/Downloads/$(arg rosbag_name).bag"/>
 
   <arg name="camera_calib_path" default="$(find object_detection)/cfg/smb264_camera_model.yaml"/>
 
@@ -38,7 +38,7 @@
       <remap from="input/image" to="$(arg input_camera_name)/image_color"/>
       <!-- <remap from="output/camera_info" to="$(arg input_camera_name)/camera_info_undistort"/> -->
       <!-- <remap from="output/image" to="$(arg input_camera_name)/undistorted"/> -->
-      <remap from="output/image" to="$(arg input_camera_name)/image_color_rect"/>
+      <remap from="output/image" to="$(arg undistorted_image_name)/image_color_rect"/>
     </node>
   </group>
 
@@ -53,8 +53,8 @@
 
     <!--Input related-->
     <!-- <param name="camera_topic" value='$(arg undistorted_image_name)/image'/> -->
-    <param name="camera_topic" value='$(arg input_camera_name)/image_color_rect'/>
-    <param name="camera_info_topic" value='$(arg input_camera_name)/camera_info'/>
+    <param name="camera_topic" value='$(arg undistorted_image_name)/image_color_rect'/>
+    <param name="camera_info_topic" value='$(arg undistorted_image_name)/camera_info'/>
     <!-- <param name="camera_info_topic" value='$(arg input_camera_name)/camera_info'/> -->
     <param name="lidar_topic" value='$(arg lidar_topic)'/>
 
@@ -92,6 +92,11 @@
     <arg name="only_BB" value='False'/>
   </include>
 
-  <node pkg="rosbag" type="play" name="player" output="screen" args="-d 3 -s 20 -r 0.5 --clock $(arg rosbag_path)" required = "false"/>
+
+  <include file="$(find smb_description)/launch/debug.launch">
+    <!--<arg name="visualize" value="1"/>-->
+  </include>
+
+  <node pkg="rosbag" type="play" name="player" output="screen" args="-d 3 --clock $(arg rosbag_path)" required = "false"/>
 
 </launch>

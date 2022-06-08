@@ -41,7 +41,7 @@ class Node:
 
         # -> Published Topics
         self.object_detection_pub_topic     = rospy.get_param('~object_detection_topic', '/objects')
-        self.object_detection_pub           = rospy.Publisher(self.object_detection_pub_topic , ObjectDetectionArray, queue_size=5)
+        self.object_detection_pub           = rospy.Publisher(self.object_detection_pub_topic , ObjectDetectionArray, queue_size=1)
         self.seq                            = 0
         
         # -> Topic Synchronization
@@ -99,7 +99,7 @@ class Node:
     # MAK note: I am actually fairly confused about what this function does.
     # It seems to be something used only for initialisation, thus I really do not think that having a dedicated subscriber makes much sense.
     def image_info_callback(self, camera_info):
-        self.optical_frame_id  = camera_info.header.frame_id
+        self.optical_frame_id  = "blackfly_right_optical_link" #camera_info.header.frame_id # change this back when included in camera info
         h                      = camera_info.height
         w                      = camera_info.width
         K                      = np.array(camera_info.K, dtype=np.float64).reshape(3,3)
