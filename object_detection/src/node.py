@@ -17,6 +17,7 @@ from object_detection.objectlocalizer   import ObjectLocalizer
 from object_detection.utils             import pointcloud2_to_xyzi, check_validity_image_info, filter_ground
 
 import warnings
+import time
 warnings.filterwarnings("ignore")
 
 UINT32      = 2**32 - 1 # might be unnecessary
@@ -91,6 +92,10 @@ class Node:
         self.objectdetector                 = ObjectDetector( self.objectdetector_cfg )           
         self.objectlocalizer                = ObjectLocalizer( self.objectlocalizer_cfg, self.config_dir )
         
+        # MAK tests
+        # self.detection_counter = 0
+        # self.accumulated_detection_time = 0
+        
         rospy.loginfo("[ObjectDetection Node] Object Detector initilization done.")
         rospy.loginfo("[ObjectDetection Node] Waiting for image info ...")
         camera_info = rospy.wait_for_message(self.camera_info_topic , CameraInfo, timeout=10)
@@ -149,8 +154,12 @@ class Node:
                 cv_image = self.imagereader.imgmsg_to_cv2(image_msg, "bgr8")
 
                 # Detect objects in image
+                # detection_start = time.time()
                 object_detection_result, object_detection_image = self.objectdetector.detect(cv_image)
-                
+                # detection_end = time.time()
+                # self.detection_counter += 1
+                # self.accumulated_detection_time += detection_end-detection_start
+                # rospy.loginfo(f"average detection took: {self.accumulated_detection_time/self.detection_counter}")
                 # Localize every detected object
                 object_list = self.objectlocalizer.localize(object_detection_result, \
                                                             pointcloud_on_image, \
