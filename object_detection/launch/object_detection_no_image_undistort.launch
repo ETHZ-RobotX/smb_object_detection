@@ -1,21 +1,27 @@
 <launch>
+  <arg  name="smb_name" 
+        default="smb261"
+        doc="Name of the SMB in the format smb26x (relevant for calibrations)"/>
 
-  <arg name="rosbag_name" default="smb_2022-06-03-15-19-59_smb"/>
-  <arg name="rosbag_path" default="/home/mads/Downloads/$(arg rosbag_name).bag"/>
+  <arg  name="camera_calib_path" 
+        default="$(find object_detection)/cfg/$(arg smb_name)_camera_model.yaml"
+        doc="Path to the camera calibration file"/>
 
-  <arg name="camera_calib_path" default="$(find object_detection)/cfg/smb264_camera_model.yaml"/>
+  <arg  name="input_camera_name" 
+        default="/versavis/cam0" 
+        doc="Name of the camera, i.e. topic prefix. Relevant for topic subscriptions."/>
 
-  <arg name="optical_frame_name" default='blackfly_right_optical_link'/>
-  <arg name="input_camera_name" default="/versavis/cam0" />
-  <arg name="undistorted_image_name" default="$(arg input_camera_name)/undistort" />
-  <arg name="lidar_topic" default='/rslidar_points'/>
+  <arg  name="lidar_topic" 
+        default='/rslidar_points'
+        doc="Topic containing the point cloud from the lidar."/>
 
-  <arg name="object_detection_classes" default="[0,1,11,25,13,74]"/>
+  <arg  name="object_detection_classes" 
+        default="[0,1,11,25,13,74]"
+        doc=  "List of the ids of classes for detection. Based on the COCO dataset, refer here: 
+              https://github.com/ethz-asl/darknet_catkin/blob/master/data/coco.names 
+              NOTICE, class ids start at 0."/>
 
-  <param name ="use_sim_time" value="true"/>
   <!--Debayer the image-->
-  <!-- <node pkg="image_proc" type="image_proc" name="debayer" ns="$(arg input_camera_name)/" /> -->
-
   <node pkg="nodelet" type="nodelet" name="debayer"
         args="standalone image_proc/debayer">
     <remap from="image_raw" to="$(arg input_camera_name)/image_raw" />
@@ -27,15 +33,13 @@
   <node name="object_detector" pkg="object_detection" type="node.py" output="screen">
 
     <!--Input related-->
-    <!-- <param name="camera_topic" value='$(arg undistorted_image_name)/image'/> -->
     <param name="camera_topic" value='$(arg input_camera_name)/image_color'/>
     <param name="camera_info_topic" value='$(arg input_camera_name)/camera_info'/>
-    <!-- <param name="camera_info_topic" value='$(arg input_camera_name)/camera_info'/> -->
     <param name="lidar_topic" value='$(arg lidar_topic)'/>
 
     <!--Output related-->
     <rosparam file="$(find object_detection)/cfg/output_params.yaml" />
-
+    
     <!--Camera Lidar synchronization related-->
     <param name="camera_lidar_sync_queue_size" value="10"/>
     <param name="camera_lidar_sync_slop" value="0.1"/>
@@ -59,17 +63,4 @@
     <param name="ground_percentage" value='25'/>
     <param name="bb_contract_percentage" value='10.0'/>
   </node>
-
-  <!-- <include file="$(find object_visualization)/launch/object_visualization.launch">
-    <arg name="object_topic" value="/objects"/>
-    <arg name="visualize_all" value='False'/>
-    <arg name="only_BB" value='False'/>
-  </include> -->
-
-  <include file="$(find smb_description)/launch/debug.launch">
-    <!--<arg name="visualize" value="1"/>-->
-  </include>
-
-  <node pkg="rosbag" type="play" name="player" output="screen" args="-d 3 --clock $(arg rosbag_path)" required = "false"/>
-
 </launch>

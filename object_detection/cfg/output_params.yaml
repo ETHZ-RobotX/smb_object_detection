@@ -1,0 +1,6 @@
+project_object_points_to_image: true
+project_all_points_to_image: false
+object_detection_pos_topic: ~object_positions
+object_detection_output_image_topic: ~detections_in_image
+object_detection_point_clouds_topic: ~detection_point_clouds
+object_detection_info_topic: ~detection_info

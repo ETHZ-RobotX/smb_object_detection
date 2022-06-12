@@ -13,6 +13,11 @@ add_message_files(
   FILES
   ObjectDetection.msg
   ObjectDetectionArray.msg
+  ObjectPosition.msg
+  ObjectPositionArray.msg
+  ObjectDetectionInfo.msg
+  ObjectDetectionInfoArray.msg
+  PointCloudArray.msg
 )
 
 generate_messages(

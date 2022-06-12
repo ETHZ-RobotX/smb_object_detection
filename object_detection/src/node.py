@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 import rospy
+import cv2
 import ros_numpy
 import numpy as np
 from os.path import join
@@ -9,12 +10,18 @@ import message_filters as mf
 from cv_bridge import CvBridge
 from sensor_msgs.msg import Image, PointCloud2, CameraInfo
 
-from object_detection_msgs.msg import ObjectDetection, ObjectDetectionArray
+from object_detection_msgs.msg import   ObjectDetection, ObjectDetectionArray, \
+                                        ObjectPosition, ObjectPositionArray, PointCloudArray,\
+                                        ObjectDetectionInfo, ObjectDetectionInfoArray
+
+from std_msgs.msg import Header
 
 from object_detection.objectdetector    import ObjectDetector
 from object_detection.pointprojector    import PointProjector
 from object_detection.objectlocalizer   import ObjectLocalizer
 from object_detection.utils             import pointcloud2_to_xyzi, check_validity_image_info, filter_ground
+from object_visualization.utils import *
+
 
 import warnings
 import time
@@ -30,6 +37,8 @@ class Node:
         # Initilized the node 
         rospy.init_node("objectify", anonymous=True)
         self.verbose                        = rospy.get_param('~verbose', True)
+        self.project_object_points_to_img   = rospy.get_param('~project_object_points_to_image', True)
+        self.project_all_points_to_img      = rospy.get_param('~project_all_points_to_image', False)
 
         # Flags to start object detection
         self.image_info_recieved            = False
@@ -41,8 +50,17 @@ class Node:
         self.lidar_topic                    = rospy.get_param('~lidar_topic', '/rslidar_points')                      
 
         # -> Published Topics
-        self.object_detection_pub_topic     = rospy.get_param('~object_detection_topic', '/objects')
-        self.object_detection_pub           = rospy.Publisher(self.object_detection_pub_topic , ObjectDetectionArray, queue_size=1)
+        # self.object_detection_pub_topic     = rospy.get_param('~object_detection_topic', '/objects')
+        self.object_detection_pub_pos_topic = rospy.get_param('~object_detection_pos_topic', '~object_positions')
+        self.object_detection_pub_img_topic = rospy.get_param('~object_detection_output_image_topic', '~detections_in_image')
+        self.object_detection_pub_pts_topic = rospy.get_param('~object_detection_point_clouds_topic', '~detection_point_clouds')
+        self.object_detection_info_topic    = rospy.get_param('~object_detection_info_topic', '~detection_info')
+
+        # self.object_detection_pub           = rospy.Publisher(self.object_detection_pub_topic , ObjectDetectionArray, queue_size=1)
+        self.object_position_pub            = rospy.Publisher(self.object_detection_pub_pos_topic , ObjectPositionArray, queue_size=1)
+        self.object_detection_img_pub       = rospy.Publisher(self.object_detection_pub_img_topic , Image, queue_size=1)
+        self.object_point_clouds_pub        = rospy.Publisher(self.object_detection_pub_pts_topic , PointCloudArray, queue_size=1)
+        self.detection_info_pub             = rospy.Publisher(self.object_detection_info_topic , ObjectDetectionInfoArray, queue_size=1)
         self.seq                            = 0
         
         # -> Topic Synchronization
@@ -166,49 +184,90 @@ class Node:
                                                             point_cloud_XYZ[in_FoV_indices], \
                                                             cv_image  )
  
-                # Create object detection message
-                object_detection_array = ObjectDetectionArray()
-                object_detection_array.header.stamp            = image_msg.header.stamp
-                object_detection_array.header.frame_id         = self.optical_frame_id
-                object_detection_array.header.seq              = self.seq
+                header = Header()
+                header.stamp = image_msg.header.stamp
+                header.frame_id = self.optical_frame_id
+                header.seq = self.seq
                 self.seq = self.seq + 1 if self.seq < UINT32-1 else 0
+
+                object_position_array = ObjectPositionArray()
+                object_position_array.header = header
+                object_information_array = ObjectDetectionInfoArray()
+                object_information_array.header = header
+                point_cloud_array = PointCloudArray()
+                point_cloud_array.header = header
+                
+                pointcloud_in_FoV = unstructured_to_structured( point_cloud_XYZ[in_FoV_indices], 
+                                                                dtype = np.dtype( [('x', np.float32), ('y', np.float32), ('z', np.float32), ('i', np.float32)] ))
+                
+                pointcloud_in_FoV = point_cloud_XYZ[in_FoV_indices]
+                                                                                
+                # if self.project_object_points_to_img or self.project_all_points_to_img:
+                #     pointcloud_on_image = np.c_[ pointcloud_on_image, np.zeros(pointcloud_on_image.shape[0]) ]
+                #     pointcloud_on_image = unstructured_to_structured( pointcloud_on_image, dtype = np.dtype( [('x', np.float32), ('y', np.float32), ('z', np.float32)] ))
 
                 # For every detected image object, fill the message object. 
                 for i in range(len(object_detection_result)):
-                    object_detection = ObjectDetection()
+                    object_position = ObjectPosition()
+                    object_information = ObjectDetectionInfo()
+                    object_point_cloud = PointCloud2()
 
-                    object_detection.class_id = object_detection_result["name"][i]
-                    object_detection.id       = object_list[i].id
+                    object_position.class_id = object_detection_result["name"][i]
+                    object_information.class_id = object_detection_result["name"][i]
+                    # print(object_detection_result["name"][i])
+                    object_position.position.x = object_list[i].pos[0]
+                    object_position.position.y = object_list[i].pos[1]
+                    object_position.position.z = object_list[i].pos[2]
 
-                    object_detection.pose_estimation_type = object_list[i].estimation_type 
+                    object_information.id       = object_list[i].id
+                    object_information.pose_estimation_type = object_list[i].estimation_type
+                    object_information.confidence = object_detection_result["confidence"][i]
 
-                    object_detection.pose.x = object_list[i].pos[0]
-                    object_detection.pose.y = object_list[i].pos[1]
-                    object_detection.pose.z = object_list[i].pos[2]
+                    object_information.bounding_box_min_x = int(object_detection_result['xmin'][i])
+                    object_information.bounding_box_min_y = int(object_detection_result['ymin'][i])
+                    object_information.bounding_box_max_x = int(object_detection_result['xmax'][i])
+                    object_information.bounding_box_max_y = int(object_detection_result['ymax'][i])
 
-                    if self.verbose:
-                        object_detection.bounding_box_min_x = int(object_detection_result['xmin'][i])
-                        object_detection.bounding_box_min_y = int(object_detection_result['ymin'][i])
-                        object_detection.bounding_box_max_x = int(object_detection_result['xmax'][i])
-                        object_detection.bounding_box_max_y = int(object_detection_result['ymax'][i])
+                    object_point_cloud = pointcloud_in_FoV[object_list[i].pt_indices,:]
+                    object_point_cloud_msg = ros_numpy.point_cloud2.array_to_pointcloud2(unstructured_to_structured(object_point_cloud, 
+                                                                dtype = np.dtype( [('x', np.float32), ('y', np.float32), ('z', np.float32), ('i', np.float32)] )))
 
-                        object_detection.on_object_point_indices = list(object_list[i].pt_indices) 
-                        
-                    object_detection_array.detections.append(object_detection)
+                    if (not self.project_all_points_to_img) and self.project_object_points_to_img:
+                        for idx, pt in enumerate(pointcloud_on_image[object_list[i].pt_indices,:]):
+                            dist = object_point_cloud[idx,2]
+                            color = depth_color(dist, min_d=0.5, max_d=20)
+                            try:
+                                cv2.circle(object_detection_image, pt[:2].astype(np.int32), 2, color, -1 )
+                            except:
+                                print("Cannot Circle \n")    
+
+                    object_position_array.positions.append(object_position)
+                    object_information_array.info.append(object_information)
+                    point_cloud_array.point_clouds.append(object_point_cloud_msg)
 
                 # Only if verbose true
-                if self.verbose:
+                # if self.verbose:
                     # Convert arrays to correct format
-                    pointcloud_on_image = np.c_[ pointcloud_on_image, np.zeros(pointcloud_on_image.shape[0]) ]
-                    pointcloud_on_image = unstructured_to_structured( pointcloud_on_image, dtype = np.dtype( [('x', np.float32), ('y', np.float32), ('z', np.float32)] ))
-                    pointcloud_in_FoV   = unstructured_to_structured( point_cloud_XYZ[in_FoV_indices], dtype = np.dtype( [('x', np.float32), ('y', np.float32), ('z', np.float32), ('i', np.float32)] ))
+                    # pointcloud_on_image = np.c_[ pointcloud_on_image, np.zeros(pointcloud_on_image.shape[0]) ]
+                    # pointcloud_on_image = unstructured_to_structured( pointcloud_on_image, dtype = np.dtype( [('x', np.float32), ('y', np.float32), ('z', np.float32)] ))
                     # Create verbose message fields
-                    object_detection_array.detections_image        = self.imagereader.cv2_to_imgmsg(object_detection_image, 'bgr8')
-                    object_detection_array.pointcloud_in_frame_2D  = ros_numpy.point_cloud2.array_to_pointcloud2(pointcloud_on_image) 
-                    object_detection_array.pointcloud_in_frame_3D  = ros_numpy.point_cloud2.array_to_pointcloud2(pointcloud_in_FoV) 
+                    # object_detection_array.pointcloud_in_frame_2D  = ros_numpy.point_cloud2.array_to_pointcloud2(pointcloud_on_image) 
+                    # object_detection_array.pointcloud_in_frame_3D  = ros_numpy.point_cloud2.array_to_pointcloud2(pointcloud_in_FoV) 
 
-                # Publish the message
-                self.object_detection_pub.publish(object_detection_array)
+                if self.project_all_points_to_img:
+                    for idx, pt in enumerate(pointcloud_on_image): 
+                        dist = pointcloud_in_FoV[idx,2]
+                        color = depth_color(dist, min_d=0.5, max_d=30)
+                        try:
+                            cv2.circle(object_detection_image, pt[:2].astype(np.int32), 3, color, -1)
+                        except:
+                            print("Cannot Circle \n")    
+                                # Publish the message
+                self.object_position_pub.publish(object_position_array)
+                self.detection_info_pub.publish(object_information_array)
+                self.object_point_clouds_pub.publish(point_cloud_array)
+                self.object_detection_img_pub.publish(self.imagereader.cv2_to_imgmsg(object_detection_image, 'bgr8'))
+
 
         # self.camera_info_sub = rospy.Subscriber(self.camera_info_topic , CameraInfo, self.image_info_callback)
         self.synchronizer.registerCallback(callback)
