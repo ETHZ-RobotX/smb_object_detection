@@ -16,6 +16,8 @@ from object_detection_msgs.msg import   ObjectDetection, ObjectDetectionArray, \
 
 from std_msgs.msg import Header
 
+from geometry_msgs.msg import PoseArray, Pose, Quaternion
+
 from object_detection.objectdetector    import ObjectDetector
 from object_detection.pointprojector    import PointProjector
 from object_detection.objectlocalizer   import ObjectLocalizer
@@ -51,13 +53,13 @@ class Node:
 
         # -> Published Topics
         # self.object_detection_pub_topic     = rospy.get_param('~object_detection_topic', '/objects')
-        self.object_detection_pub_pos_topic = rospy.get_param('~object_detection_pos_topic', '~object_positions')
+        self.object_detection_pub_pose_topic = rospy.get_param('~object_detection_pose_topic', '~object_poses')
         self.object_detection_pub_img_topic = rospy.get_param('~object_detection_output_image_topic', '~detections_in_image')
         self.object_detection_pub_pts_topic = rospy.get_param('~object_detection_point_clouds_topic', '~detection_point_clouds')
         self.object_detection_info_topic    = rospy.get_param('~object_detection_info_topic', '~detection_info')
 
         # self.object_detection_pub           = rospy.Publisher(self.object_detection_pub_topic , ObjectDetectionArray, queue_size=1)
-        self.object_position_pub            = rospy.Publisher(self.object_detection_pub_pos_topic , ObjectPositionArray, queue_size=1)
+        self.object_pose_pub                = rospy.Publisher(self.object_detection_pub_pose_topic , PoseArray, queue_size=1)
         self.object_detection_img_pub       = rospy.Publisher(self.object_detection_pub_img_topic , Image, queue_size=1)
         self.object_point_clouds_pub        = rospy.Publisher(self.object_detection_pub_pts_topic , PointCloudArray, queue_size=1)
         self.detection_info_pub             = rospy.Publisher(self.object_detection_info_topic , ObjectDetectionInfoArray, queue_size=1)
@@ -190,8 +192,8 @@ class Node:
                 header.seq = self.seq
                 self.seq = self.seq + 1 if self.seq < UINT32-1 else 0
 
-                object_position_array = ObjectPositionArray()
-                object_position_array.header = header
+                object_pose_array = PoseArray()
+                object_pose_array.header = header
                 object_information_array = ObjectDetectionInfoArray()
                 object_information_array.header = header
                 point_cloud_array = PointCloudArray()
@@ -208,17 +210,20 @@ class Node:
 
                 # For every detected image object, fill the message object. 
                 for i in range(len(object_detection_result)):
-                    object_position = ObjectPosition()
+                    object_pose = Pose()
                     object_information = ObjectDetectionInfo()
                     object_point_cloud = PointCloud2()
 
-                    object_position.class_id = object_detection_result["name"][i]
                     object_information.class_id = object_detection_result["name"][i]
                     # print(object_detection_result["name"][i])
-                    object_position.position.x = object_list[i].pos[0]
-                    object_position.position.y = object_list[i].pos[1]
-                    object_position.position.z = object_list[i].pos[2]
+                    object_pose.position.x = object_list[i].pos[0]
+                    object_pose.position.y = object_list[i].pos[1]
+                    object_pose.position.z = object_list[i].pos[2]
+                    object_pose.orientation = Quaternion(0,0,0,1)
 
+                    object_information.position.x = object_list[i].pos[0]
+                    object_information.position.y = object_list[i].pos[1]
+                    object_information.position.z = object_list[i].pos[2]
                     object_information.id       = object_list[i].id
                     object_information.pose_estimation_type = object_list[i].estimation_type
                     object_information.confidence = object_detection_result["confidence"][i]
@@ -241,7 +246,7 @@ class Node:
                             except:
                                 print("Cannot Circle \n")    
 
-                    object_position_array.positions.append(object_position)
+                    object_pose_array.poses.append(object_pose)
                     object_information_array.info.append(object_information)
                     point_cloud_array.point_clouds.append(object_point_cloud_msg)
 
@@ -263,7 +268,7 @@ class Node:
                         except:
                             print("Cannot Circle \n")    
                                 # Publish the message
-                self.object_position_pub.publish(object_position_array)
+                self.object_pose_pub.publish(object_pose_array)
                 self.detection_info_pub.publish(object_information_array)
                 self.object_point_clouds_pub.publish(point_cloud_array)
                 self.object_detection_img_pub.publish(self.imagereader.cv2_to_imgmsg(object_detection_image, 'bgr8'))

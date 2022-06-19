@@ -11,3 +11,6 @@ float64 confidence
 
 string pose_estimation_type
 
+geometry_msgs/Point position
+
+
