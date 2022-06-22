@@ -1,4 +1,0 @@
-#  3rd party 
-[submodule "image_undistort"]
-	path = image_undistort
-	url = git@github.com:ethz-asl/image_undistort.git
