@@ -1,19 +1,31 @@
 <launch>
-
-  <arg name="rosbag_name" default="smb_2022-06-03-15-19-59_smb"/>
-  <arg name="rosbag_path" default="/home/mads/Downloads/$(arg rosbag_name).bag"/>
+  <!-- launch file to run object detection:
+       by default, the object detection runs on the jetson xavier GPU
+       while the images are debayered on the local machine. -->
 
   <arg  name="smb_name" 
-        default="smb261"
+        default="$(optenv SMB_NAME smb261)"
         doc="Name of the SMB in the format smb26x (relevant for calibrations)"/>
+
+  <arg  name="gpu" 
+        default="remote"
+        doc="Run on GPU? Options: 'local', 'remote' (default), 'false'"/>
+
+  <arg  name="GPU_user" 
+        default="$(env USER)"
+        doc="Username to use on the jetson xavier GPU"/>
 
   <arg  name="camera_calib_path" 
         default="$(find object_detection)/cfg/$(arg smb_name)_camera_model.yaml"
         doc="Path to the camera calibration file"/>
 
   <arg  name="input_camera_name" 
-        default="/versavis/cam0" 
+        default="/versavis/cam0/slow" 
         doc="Name of the camera, i.e. topic prefix. Relevant for topic subscriptions."/>
+
+  <arg  name="debayer_image" 
+        default="true" 
+        doc="Debayer the images (supplied in $input_camera_name/image_raw)."/>
 
   <arg  name="lidar_topic" 
         default='/rslidar_points'
@@ -21,31 +33,32 @@
 
   <arg  name="object_detection_classes" 
         default="[0,1,11,25,13,74]"
-        doc=  "List of the ids of classes for detection. Based on the COCO dataset, refer here: 
-              https://github.com/ethz-asl/darknet_catkin/blob/master/data/coco.names 
-              NOTICE, class ids start at 0."/>
+        doc=  "List of the ids of classes for detection. Based on the COCO dataset, refer here: https://github.com/ethz-asl/darknet_catkin/blob/master/data/coco.names. bNOTICE, class ids start at 0."/>
+
+  <!-- evaluate where to run object detection node (based on argument gpu) -->
+  <arg name="object_detection_host" value="" unless="$(eval arg('gpu')=='remote')" />
+  <arg name="object_detection_host" value="jetson" if="$(eval arg('gpu')=='remote')" />
+
+  <!-- evaluate whether to run object detection on gpu (0) or cpu -->
+  <arg name="object_detection_device" value="cpu" if="$(eval arg('gpu')=='false')" />
+  <arg name="object_detection_device" value="0" unless="$(eval arg('gpu')=='false')" />
 
   <!--Debayer the image-->
-  <node pkg="nodelet" type="nodelet" name="debayer"
-        args="standalone image_proc/debayer">
-    <remap from="image_raw" to="$(arg input_camera_name)/image_raw" />
-    <remap from="image_color" to="$(arg input_camera_name)/image_color" />
-    <remap from="image_mono" to="$(arg input_camera_name)/image_mono" />
-  </node>
+  <include file="$(find object_detection)/launch/debayer.launch" if="$(eval debayer_image)" >
+    <arg name="input_camera_name" value="$(arg input_camera_name)" />
+  </include>
 
-  <node name="image_dropper" type="drop" pkg="topic_tools" args="$(arg input_camera_name)/image_color 6 7" />
-
+  <!-- object detection launched on jetson 
+       ! Assumes same username as on current host ! -->
   <machine  name="jetson" 
-            address="192.168.55.1" 
+            address="jetson-xavier" 
             env-loader="/home/robotx/catkin_workspaces/smb_dev/src/object_detection/object_detection/launch/jetson_env.sh" 
-            user="robotx"
-            password="robotx"
+            user="$(arg GPU_user)"
             default="false"/>
-  <!-- object detection launched on jetson -->
-  <node machine="jetson" name="object_detector" pkg="object_detection" type="node.py" output="screen">
+  <node machine="$(arg object_detection_host)" name="object_detector" pkg="object_detection" type="node.py" output="screen">
 
     <!--Input related-->
-    <param name="camera_topic" value='$(arg input_camera_name)/image_color_drop'/>
+    <param name="camera_topic" value='$(arg input_camera_name)/image_color'/>
     <param name="camera_info_topic" value='$(arg input_camera_name)/camera_info'/>
     <param name="lidar_topic" value='$(arg lidar_topic)'/>
 
@@ -64,7 +77,7 @@
 
     <!--Object detection related-->
     <param name="model" value='yolov5l6'/>
-    <param name="device" value='0'/>
+    <param name="device" value='$(arg object_detection_device)'/>
     <param name="confident" value='0.4'/>
     <param name="iou" value='0.1'/>
     <rosparam param="classes" subst_value="True">$(arg object_detection_classes)</rosparam> >
@@ -75,9 +88,4 @@
     <param name="ground_percentage" value='25'/>
     <param name="bb_contract_percentage" value='10.0'/>
   </node>
-
-  <!-- <rosparam file="/home/mads/Downloads/smb_2022-06-03-15-19-59.yaml" /> -->
-
-
-
 </launch>
