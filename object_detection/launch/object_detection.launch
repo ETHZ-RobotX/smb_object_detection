@@ -73,7 +73,7 @@
     <param name="config_dir" value='/home/robotx/catkin_workspaces/smb_dev/src/object_detection/object_detection/cfg/'/>
 
     <!--Point Projector related-->
-    <param name="project_config" value='projector_config_SMB264.yaml'/>
+    <param name="project_config" value='projector_config_$(arg smb_name).yaml'/>
 
     <!--Object detection related-->
     <param name="model" value='yolov5l6'/>
