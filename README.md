@@ -45,12 +45,12 @@ Detections will be published in the optical frame, which is a parameter to the s
 | bb_contract_percentage | 10 | The percentage how much the edges of bounding box should be contracted. |
 | verbose | False | If it is True the output message topic contains the optional topics. | 
 
-## The Output Message Format and Extra Package: Object Visualization
+### Published topics
 
-This package has only one script that shows how the object detection output should be used. This package can be also used to visualize the detections on image and also on the map frame with markers. Please refer to the [node.py](/object_visualization/src/node.py) to see how to use the output message.
+- *detection_info*
+- *detection_point_clouds*
+- *detections_in_image*
+- *object_poses*
 
 ### **IMPORTANT REMARK ABOUT THE OUTPUT** ###
 If the z axis of a detected object is -1, the object is not correctly localized. This happens if an object is detected by the camera but there are not enough Lidar points/measurement inside the bounding box of it.
-
-## Extra Package: Object Visualization
-This package has only one script that  shows how the object detection output should be used. This package can be also used to visualize the detections on image and also on the map frame with markers.
