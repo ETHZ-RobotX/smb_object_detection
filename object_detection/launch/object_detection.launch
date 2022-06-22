@@ -15,10 +15,6 @@
         default="$(env USER)"
         doc="Username to use on the jetson xavier GPU"/>
 
-  <arg  name="camera_calib_path" 
-        default="$(find object_detection)/cfg/$(arg smb_name)_camera_model.yaml"
-        doc="Path to the camera calibration file"/>
-
   <arg  name="input_camera_name" 
         default="/versavis/cam0/slow" 
         doc="Name of the camera, i.e. topic prefix. Relevant for topic subscriptions."/>
