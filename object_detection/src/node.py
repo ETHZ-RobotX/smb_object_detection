@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 import rospy
+import rospkg
 import ros_numpy
 import numpy as np
 from os.path import join
@@ -36,6 +37,7 @@ class Node:
     def __init__(self):
         
         rospy.loginfo("[ObjectDetection Node] Object Detector initilization starts ...")
+        self.rospack = rospkg.RosPack()
 
         # Initilized the node 
         rospy.init_node("objectify", anonymous=True)
@@ -78,7 +80,7 @@ class Node:
                                                                                self.camera_lidar_sync_slop)
         
         # ---------- Config Directory ----------
-        self.config_dir                     = rospy.get_param('~config_dir', None)
+        self.config_dir                     = join(self.rospack.get_path('object_detection'),'cfg')
 
         # ---------- Point Projector Related ---------- 
         self.project_cfg                  = rospy.get_param('~project_config', None)

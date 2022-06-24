@@ -65,9 +65,6 @@
     <param name="camera_lidar_sync_queue_size" value="10"/>
     <param name="camera_lidar_sync_slop" value="0.1"/>
 
-    <!--Config files-->
-    <param name="config_dir" value='/home/robotx/catkin_workspaces/smb_dev/src/object_detection/object_detection/cfg/'/>
-
     <!--Point Projector related-->
     <param name="project_config" value='projector_config_$(arg smb_name).yaml'/>
 
