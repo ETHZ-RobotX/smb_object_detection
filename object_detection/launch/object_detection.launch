@@ -48,7 +48,7 @@
        ! Assumes same username as on current host ! -->
   <machine  name="jetson" 
             address="jetson-xavier" 
-            env-loader="/home/robotx/catkin_workspaces/smb_dev/src/object_detection/object_detection/launch/jetson_env.sh" 
+            env-loader="~/jetson_env.sh" 
             user="$(arg GPU_user)"
             default="false"/>
   <node machine="$(arg object_detection_host)" name="object_detector" pkg="object_detection" type="node.py" output="screen">
