@@ -70,7 +70,7 @@
 
     <!--Object detection related-->
     <param name="model" value='yolov5l6'/>
-    <param name="model_path" value='/home/mads/workspaces/RSS_ws/src/yolov5'/> <!-- change this to match on the smb -->
+    <param name="model_path" value='/usr/share/yolo/models'/>
     <!-- <param name="model_path" value=''/> -->
     <param name="device" value='$(arg object_detection_device)'/>
     <!-- <param name="device" value='cpu'/> -->
