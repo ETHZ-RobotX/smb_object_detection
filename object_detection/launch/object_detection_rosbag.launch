@@ -10,11 +10,14 @@
         default="/versavis/cam0" 
         doc="Name of the camera, i.e. topic prefix. Relevant for topic subscriptions."/>
 
+  <node name="image_dropper" type="drop" pkg="topic_tools" args="$(arg input_camera_name)/image_raw 19 20 $(arg input_camera_name)/slow/image_raw" />
+  <node name="camera_info_dropper" type="drop" pkg="topic_tools" args="$(arg input_camera_name)/camera_info 19 20 $(arg input_camera_name)/slow/camera_info" />
+
   <param name ="use_sim_time" value="true"/>
 
   <include file="$(find object_detection)/launch/object_detection.launch">
     <arg name="gpu" value="$(arg gpu)" />
-    <arg name="input_camera_name" value="$(arg input_camera_name)" />
+    <!-- <arg name="input_camera_name" value="$(arg input_camera_name)" /> -->
   </include>
 
   <node name="rviz" pkg="rviz" type="rviz" respawn="false" output="screen" args="-d $(find object_detection)/rviz/object_detection.rviz">
