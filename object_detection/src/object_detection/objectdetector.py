@@ -13,6 +13,7 @@ class ObjectDetector:
 
         self.architecture       = config["architecture"]
         self.model              = config["model"]
+        self.model_path         = config["model_path"]
         self.checkpoint         = config["checkpoint"]
         self.device             = config["device"]
         self.confident          = config["confident"]
@@ -22,7 +23,14 @@ class ObjectDetector:
         self.detector           = None
 
         if self.architecture == 'yolo':
-            self.detector = torch.hub.load('ultralytics/yolov5', self.model , device=self.device) # 'yolov5n'
+            if self.model_path:
+                print("Path: ", self.model_path + self.model + ".pt")
+                print("Device: ", self.device)
+                # self.detector = torch.load(self.model_path + self.model + ".pt")
+                self.detector = torch.hub.load(self.model_path, self.model, source='local', device=self.device) # 'yolov5n'
+            else:
+                print("No model path defined, loading from hub")
+                self.detector = torch.hub.load('ultralytics/yolov5', self.model , device=self.device) # 'yolov5n'
             self.detector.conf = self.confident
             self.detector.iou = self.iou
             self.detector.classes = self.classes

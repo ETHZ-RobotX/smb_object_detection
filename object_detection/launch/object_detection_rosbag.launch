@@ -1,29 +1,22 @@
 <launch>
 <!-- TODO load the bag yaml file -->
-  <arg name="remote" default="true" />
   <arg name="rosbag_name" default="smb_2022-06-03-15-19-59_smb"/>
   <arg name="rosbag_path" default="/home/mads/Downloads/$(arg rosbag_name).bag"/>
+  <arg  name="gpu" 
+        default="off"
+        doc="Run on GPU? Options: 'local', 'remote', 'off' (default)"/>
 
-  <arg name="camera_calib_path" default="$(find object_detection)/cfg/smb264_camera_model.yaml"/>
-
-  <arg name="input_camera_name" default="/versavis/cam0" />
-  <arg name="undistorted_image_name" default="$(arg input_camera_name)/undistort" />
-  <arg name="lidar_topic" default='/rslidar_points'/>
-
-  <arg name="object_detection_classes" default="[0,1,11,25,13,74]"/>
+  <arg  name="input_camera_name" 
+        default="/versavis/cam0" 
+        doc="Name of the camera, i.e. topic prefix. Relevant for topic subscriptions."/>
 
   <param name ="use_sim_time" value="true"/>
 
-  <include  file="$(find object_detection)/launch/object_detection_no_image_undistort.launch" 
-            pass_all_args="true" 
-            unless="$(arg remote)" />
+  <include file="$(find object_detection)/launch/object_detection.launch">
+    <arg name="gpu" value="$(arg gpu)" />
+    <arg name="input_camera_name" value="$(arg input_camera_name)" />
+  </include>
 
-  <include  file="$(find object_detection)/launch/object_detection_remote.launch" 
-            pass_all_args="true" 
-            if="$(arg remote)" />
-
-  <!-- <rosparam command="load" file="/home/mads/Downloads/smb_2022-06-03-15-19-59.yaml" /> -->
-<!-- remove  -->
   <node name="rviz" pkg="rviz" type="rviz" respawn="false" output="screen" args="-d $(find object_detection)/rviz/object_detection.rviz">
     <rosparam command="load" file="/home/mads/Downloads/smb_2022-06-03-15-19-59.yaml" />
   </node>
