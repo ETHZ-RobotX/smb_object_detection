@@ -15,11 +15,9 @@ pip install -r requirements.txt
 ```
 
 ### Loading Detection Model From Local Repository
-By default, a pretrained yolov5 model is used for object detection. This model can be loaded from an online repository, however, it is often convenient to load the model from a local directory. To do so, clone the yolov5 repository to the machine that will be running the node:
-```
-git clone git@github.com:ultralytics/yolov5.git
-```
-Then ensure that the ROS parameter `model_path` points to the directory of the repository. For more information on the different available launch parameters see [below](#launching-and-parameters)
+By default, a pretrained yolov5 model is used for object detection. This model can be loaded from an online repository, however, it is often convenient to load the model from a local directory. To do so, download a model from the [release page](https://github.com/ultralytics/yolov5/releases)
+
+Then ensure that the ROS parameter `model_path` points to the directory where the model is stored and that `model` reflects the name of the model, e.g. `yolov5l6`.  For more information on the different available launch parameters see [below](#launching-and-parameters)
 
 ## Launching and Parameters
 
@@ -43,7 +41,7 @@ The default setup assumes lauching the pipeline on a remote NVIDIA Jetson. For a
 | lidar_topic                  | /rslidar_points                                       | Lidar mesage topic name                |
 | camera_lidar_sync_queue_size | 10                                                    | How many frame should be searched to find appropiate time stamp. Please refer [here](http://wiki.ros.org/message_filters#ApproximateTime_Policy).|
 | camera_lidar_sync_slop       | 0.1                                                   | The maximim time difference between syncronized topics. In real-time usage it might be large due to the fact that sensors start running at different time. Please refer [here](http://wiki.ros.org/message_filters#ApproximateTime_Policy).|
-| model_path                   | TBD                                                   | The path to the local yolov5 repository. If left empty, `''`, the model will be loaded from the online repository.|
+| model_path                   | /usr/share/yolo/models                                | The path to the directory containing the local yolov5 model. If left empty, `''`, the model will be loaded from the online repository.|
 | model                        | yolov5l6                                              | The yolo model that will be used. Internet connection might be needed to install the weights. For available models please refer [here](https://github.com/ultralytics/yolov5/releases). The model size is the main factor of the speed of the package. Smaller models can be utilized for realtime usage such as yolov5n / yolov5n6. |
 | device                       | cpu                                                   | The device that the model will run on. cpu or a cuda device as 0,1,2 ... By default this is set automatically for smb usage based on the `gpu` argument.|
 | confident                    | 0.4                                                   | Non-maxima supression threshold, used in the elimination of duplicate detections.|
