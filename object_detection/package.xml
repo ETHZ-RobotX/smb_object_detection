@@ -23,4 +23,5 @@
   <exec_depend>message_runtime</exec_depend>
   <exec_depend>image_undistort</exec_depend>
   <exec_depend>image_proc</exec_depend>
+  <exec_depend>yolov5</exec_depend>
 </package>
