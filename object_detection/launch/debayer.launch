@@ -1,0 +1,12 @@
+<launch>
+  <arg name="input_camera_name"
+       default="/versavis/cam0/slow"
+       doc="Namespace of the camera/image stream that should be debayerd" />
+
+  <node pkg="nodelet" type="nodelet" name="debayer"
+        args="standalone image_proc/debayer">
+    <remap from="image_raw" to="$(arg input_camera_name)/image_raw" />
+    <remap from="image_color" to="$(arg input_camera_name)/image_color" />
+    <remap from="image_mono" to="$(arg input_camera_name)/image_mono" />
+  </node>
+</launch>

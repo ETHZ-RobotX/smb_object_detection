@@ -1,77 +1,34 @@
 <launch>
+<!-- TODO load the bag yaml file -->
+  <arg name="rosbag_name" default="smb_2022-06-03-15-19-59_smb"/>
+  <arg name="rosbag_path" default="/home/mads/Downloads/$(arg rosbag_name).bag"/>
+  <arg  name="gpu" 
+        default="off"
+        doc="Run on GPU? Options: 'local', 'remote', 'off' (default)"/>
 
-  <arg name="rosbag_name" default="bike_17_smb"/>
-  <arg name="rosbag_path" default="/media/oilter/D4561E4E561E31AA/SemesterProject/Y2022-01-31/$(arg rosbag_name).bag"/>
+  <arg  name="input_camera_name" 
+        default="/versavis/cam0" 
+        doc="Name of the camera, i.e. topic prefix. Relevant for topic subscriptions."/>
 
-  <arg name="camera_calib_path" default="$(find object_detection)/cfg/smb264_camera_model.yaml"/>
+  <node name="image_dropper" type="drop" pkg="topic_tools" args="$(arg input_camera_name)/image_raw 19 20 $(arg input_camera_name)/slow/image_raw" />
+  <node name="camera_info_dropper" type="drop" pkg="topic_tools" args="$(arg input_camera_name)/camera_info 19 20 $(arg input_camera_name)/slow/camera_info" />
 
-  <arg name="optical_frame_name" default='blackfly_right_optical_link'/>
-  <arg name="input_camera_name" default="/versavis/cam0" />
-  <arg name="lidar_topic" default='/rslidar_points'/>
+  <param name ="use_sim_time" value="true"/>
 
-  <arg name="object_detection_classes" default="[1]"/>
-
-  <!--Debayer the image-->
-  <node pkg="image_proc" type="image_proc" name="debayer" ns="$(arg input_camera_name)/" />
-  
-  <!--Undistored the debayered image-->
-  <!--https://github.com/ethz-asl/image_undistort-->
-  <node name="image_undistort_node" pkg="image_undistort" type="image_undistort_node" output="screen" clear_params="true">
-    <param name="input_camera_namespace" value="versavis"/>      
-    <param name="input_camera_info_from_ros_params" value = "true"/>    
-    <param name="scale" value="1.0"/>
-    <param name="output_camera_info_source" value="auto_generated"/>   <!--auto_generated,match_input--> 
-    <param name="publish_tf" value="false"/>
-    <param name="output_frame" value="$(arg optical_frame_name)"/>
-    <rosparam file="$(arg camera_calib_path)"/>
-    <remap from="input/image" to="$(arg input_camera_name)/image_color"/>
-    <remap from="output/image" to="$(arg input_camera_name)/undistorted"/>
-  </node>
-
-  <!--Object detection node-->
-  <node name="objectify" pkg="object_detection" type="node.py" output="screen">
-
-    <!--Input related-->
-    <param name="camera_topic" value='$(arg input_camera_name)/undistorted'/>
-    <param name="camera_info_topic" value='$(arg input_camera_name)/camera_info'/>
-    <param name="lidar_topic" value='$(arg lidar_topic)'/>
-
-    <!--Output related-->
-    <param name="object_detection_topic" value='/objects'/>
-    <param name="verbose" value='True'/>
-
-    <!--Camera Lidar synchronization related-->
-    <param name="camera_lidar_sync_queue_size" value="10"/>
-    <param name="camera_lidar_sync_slop" value="0.1"/>
-
-    <!--Config files-->
-    <param name="config_dir" value='$(find object_detection)/cfg/'/>
-
-    <!--Point Projector related-->
-    <param name="project_config" value='projector_config_SMB264.yaml'/>
-
-    <!--Object detection related-->
-    <param name="model" value='yolov5l6'/>
-    <param name="device" value='cpu'/>
-    <param name="confident" value='0.4'/>
-    <param name="iou" value='0.1'/>
-    <rosparam param="classes" subst_value="True">$(arg object_detection_classes)</rosparam> >
-    <param name="multiple_instance" value='False'/>
-
-    <!--Object localization related-->
-    <param name="model_method" value='hdbscan'/>
-    <param name="ground_percentage" value='25'/>
-    <param name="bb_contract_percentage" value='10.0'/>
-  </node>
-
-
-
-  <include file="$(find object_visualization)/launch/object_visualization.launch">
-    <arg name="object_topic" value="/objects"/>
-    <arg name="visualize_all" value='False'/>
-    <arg name="only_BB" value='False'/>
+  <include file="$(find object_detection)/launch/object_detection.launch">
+    <arg name="gpu" value="$(arg gpu)" />
+    <!-- <arg name="input_camera_name" value="$(arg input_camera_name)" /> -->
   </include>
 
-  <node pkg="rosbag" type="play" name="player" output="screen" args="-d 3 -s 0 -r 0.2 $(arg rosbag_path)" required = "false"/>
+  <node name="rviz" pkg="rviz" type="rviz" respawn="false" output="screen" args="-d $(find object_detection)/rviz/object_detection.rviz">
+    <rosparam command="load" file="/home/mads/Downloads/smb_2022-06-03-15-19-59.yaml" />
+  </node>
 
+  <node pkg="rosbag" type="play" name="player" output="screen" args="-d 3 --clock $(arg rosbag_path)" required = "false"/>
 </launch>
+
+<!-- HAve it run locally on Jetson -->
+<!-- Clean code and launch folder -->
+<!-- yolo runs from local -->
+<!-- Try to launch jetson stuff from "nuc", look at machine tag -->
+<!-- seperate launch file for local and jetson -->

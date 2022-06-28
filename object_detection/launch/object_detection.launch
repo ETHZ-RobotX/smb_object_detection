@@ -1,55 +1,79 @@
 <launch>
+  <!-- launch file to run object detection:
+       by default, the object detection runs on the jetson xavier GPU
+       while the images are debayered on the local machine. -->
 
-  <arg name="camera_calib_path" default="$(find object_detection)/cfg/smb264_camera_model.yaml"/>
+  <arg  name="smb_name" 
+        default="$(optenv SMB_NAME smb261)"
+        doc="Name of the SMB in the format smb26x (relevant for calibrations)"/>
 
-  <arg name="optical_frame_name" default='blackfly_right_optical_link'/>
-  <arg name="input_camera_name" default="/versavis/cam0" />
-  <arg name="lidar_topic" default='/rslidar_points'/>
+  <arg  name="gpu" 
+        default="remote"
+        doc="Run on GPU? Options: 'local', 'remote' (default), 'off'"/>
 
-  <arg name="object_detection_classes" default="[0]"/>
+  <arg  name="GPU_user" 
+        default="$(env USER)"
+        doc="Username to use on the jetson xavier GPU"/>
+
+  <arg  name="input_camera_name" 
+        default="/versavis/cam0/slow" 
+        doc="Name of the camera, i.e. topic prefix. Relevant for topic subscriptions."/>
+
+  <arg  name="debayer_image" 
+        default="true" 
+        doc="Debayer the images (supplied in $input_camera_name/image_raw)."/>
+
+  <arg  name="lidar_topic" 
+        default='/rslidar_points'
+        doc="Topic containing the point cloud from the lidar."/>
+
+  <arg  name="object_detection_classes" 
+        default="[0,1,11,25,13,74]"
+        doc=  "List of the ids of classes for detection. Based on the COCO dataset, refer here: https://github.com/ethz-asl/darknet_catkin/blob/master/data/coco.names. bNOTICE, class ids start at 0."/>
+
+  <!-- evaluate where to run object detection node (based on argument gpu) -->
+  <arg name="object_detection_host" value="" unless="$(eval arg('gpu')=='remote')" />
+  <arg name="object_detection_host" value="jetson" if="$(eval arg('gpu')=='remote')" />
+
+  <!-- evaluate whether to run object detection on gpu (0) or cpu -->
+  <arg name="object_detection_device" value="0" unless="$(eval arg('gpu')=='off')" />
+  <arg name="object_detection_device" value="cpu" if="$(eval arg('gpu')=='off')" />
 
   <!--Debayer the image-->
-  <node pkg="image_proc" type="image_proc" name="debayer" ns="$(arg input_camera_name)/" />
-  
-  <!--Undistored the debayered image-->
-  <!--https://github.com/ethz-asl/image_undistort-->
-  <node name="image_undistort_node" pkg="image_undistort" type="image_undistort_node" output="screen" clear_params="true">
-    <param name="input_camera_namespace" value="versavis"/>      
-    <param name="input_camera_info_from_ros_params" value = "true"/>    
-    <param name="scale" value="1.0"/>
-    <param name="output_camera_info_source" value="auto_generated"/>   <!--auto_generated,match_input--> 
-    <param name="publish_tf" value="false"/>
-    <param name="output_frame" value="$(arg optical_frame_name)"/>
-    <rosparam file="$(arg camera_calib_path)"/>
-    <remap from="input/image" to="$(arg input_camera_name)/image_color"/>
-    <remap from="output/image" to="$(arg input_camera_name)/undistorted"/>
-  </node>
+  <include file="$(find object_detection)/launch/debayer.launch" if="$(eval debayer_image)" >
+    <arg name="input_camera_name" value="$(arg input_camera_name)" />
+  </include>
 
-  <!--Object detection node-->
-  <node name="objectify" pkg="object_detection" type="node.py" output="screen">
+  <!-- object detection launched on jetson 
+       ! Assumes same username as on current host ! -->
+  <machine  name="jetson" 
+            address="jetson-xavier" 
+            env-loader="~/jetson_env.sh" 
+            user="$(arg GPU_user)"
+            default="false"/>
 
+    <node machine="$(arg object_detection_host)" name="object_detector" pkg="object_detection" type="node.py" output="screen">
     <!--Input related-->
-    <param name="camera_topic" value='$(arg input_camera_name)/undistorted'/>
+    <param name="camera_topic" value='$(arg input_camera_name)/image_color'/>
     <param name="camera_info_topic" value='$(arg input_camera_name)/camera_info'/>
     <param name="lidar_topic" value='$(arg lidar_topic)'/>
 
     <!--Output related-->
-    <param name="object_detection_topic" value='/objects'/>
-    <param name="verbose" value='False'/>
-
+    <rosparam file="$(find object_detection)/cfg/output_params.yaml" />
+    
     <!--Camera Lidar synchronization related-->
     <param name="camera_lidar_sync_queue_size" value="10"/>
     <param name="camera_lidar_sync_slop" value="0.1"/>
 
-    <!--Config files-->
-    <param name="config_dir" value='$(find object_detection)/cfg/'/>
-
     <!--Point Projector related-->
-    <param name="project_config" value='projector_config_SMB264.yaml'/>
+    <param name="project_config" value='projector_config_$(arg smb_name).yaml'/>
 
     <!--Object detection related-->
-    <param name="model" value='yoLov5l6'/>
-    <param name="device" value='cpu'/>
+    <param name="model" value='yolov5l6'/>
+    <param name="model_path" value='/usr/share/yolo/models'/>
+    <!-- <param name="model_path" value=''/> -->
+    <param name="device" value='$(arg object_detection_device)'/>
+    <!-- <param name="device" value='cpu'/> -->
     <param name="confident" value='0.4'/>
     <param name="iou" value='0.1'/>
     <rosparam param="classes" subst_value="True">$(arg object_detection_classes)</rosparam> >
@@ -60,11 +84,4 @@
     <param name="ground_percentage" value='25'/>
     <param name="bb_contract_percentage" value='10.0'/>
   </node>
-
-  <include file="$(find object_visualization)/launch/object_visualization.launch">
-    <arg name="object_topic" value="/objects"/>
-    <arg name="visualize_all" value='False'/>
-    <arg name="only_BB" value='False'/>
-  </include>
-
 </launch>

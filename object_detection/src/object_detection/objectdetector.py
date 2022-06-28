@@ -1,4 +1,5 @@
 import torch
+import numpy as np
 
 # from detectron2 import model_zoo
 # from detectron2.engine import DefaultPredictor
@@ -7,12 +8,15 @@ import torch
 # from detectron2.data import MetadataCatalog
 
 from rospy.exceptions import ROSInitException 
+from yolov5.models.common import DetectMultiBackend, AutoShape
+from yolov5.utils.torch_utils import select_device
 
 class ObjectDetector:
     def __init__(self, config):
 
         self.architecture       = config["architecture"]
         self.model              = config["model"]
+        self.model_path         = config["model_path"]
         self.checkpoint         = config["checkpoint"]
         self.device             = config["device"]
         self.confident          = config["confident"]
@@ -22,7 +26,16 @@ class ObjectDetector:
         self.detector           = None
 
         if self.architecture == 'yolo':
-            self.detector = torch.hub.load('ultralytics/yolov5', self.model , device=self.device) # 'yolov5n'
+            if self.model_path:
+                print("Path: ", self.model_path + self.model + ".pt")
+                print("Device: ", self.device)
+                device = select_device(self.device)
+                self.detector = DetectMultiBackend(self.model_path + "/" + self.model + ".pt", device=device)
+                self.detector = AutoShape(self.detector)
+                self.detector = self.detector.to(device)
+            else:
+                print("No model path defined, loading from hub")
+                self.detector = torch.hub.load('ultralytics/yolov5', self.model , device=self.device) # 'yolov5n'
             self.detector.conf = self.confident
             self.detector.iou = self.iou
             self.detector.classes = self.classes

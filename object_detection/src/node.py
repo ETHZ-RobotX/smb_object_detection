@@ -1,22 +1,32 @@
 #!/usr/bin/env python
 import rospy
+import rospkg
 import ros_numpy
 import numpy as np
+
 from os.path import join
 from numpy.lib.recfunctions import unstructured_to_structured
 
 import message_filters as mf
+import sklearn
+import cv2
 from cv_bridge import CvBridge
 from sensor_msgs.msg import Image, PointCloud2, CameraInfo
 
-from object_detection.msg import ObjectDetection, ObjectDetectionArray
+from object_detection_msgs.msg import   PointCloudArray,\
+                                        ObjectDetectionInfo, ObjectDetectionInfoArray
+
+from std_msgs.msg import Header
+
+from geometry_msgs.msg import PoseArray, Pose, Quaternion
 
 from object_detection.objectdetector    import ObjectDetector
 from object_detection.pointprojector    import PointProjector
 from object_detection.objectlocalizer   import ObjectLocalizer
-from object_detection.utils             import pointcloud2_to_xyzi, check_validity_image_info, filter_ground
+from object_detection.utils             import *
 
 import warnings
+import time
 warnings.filterwarnings("ignore")
 
 UINT32      = 2**32 - 1 # might be unnecessary
@@ -25,10 +35,13 @@ class Node:
     def __init__(self):
         
         rospy.loginfo("[ObjectDetection Node] Object Detector initilization starts ...")
+        self.rospack = rospkg.RosPack()
 
         # Initilized the node 
         rospy.init_node("objectify", anonymous=True)
         self.verbose                        = rospy.get_param('~verbose', True)
+        self.project_object_points_to_img   = rospy.get_param('~project_object_points_to_image', True)
+        self.project_all_points_to_img      = rospy.get_param('~project_all_points_to_image', False)
 
         # Flags to start object detection
         self.image_info_recieved            = False
@@ -40,8 +53,17 @@ class Node:
         self.lidar_topic                    = rospy.get_param('~lidar_topic', '/rslidar_points')                      
 
         # -> Published Topics
-        self.object_detection_pub_topic     = rospy.get_param('~object_detection_topic', '/objects')
-        self.object_detection_pub           = rospy.Publisher(self.object_detection_pub_topic , ObjectDetectionArray, queue_size=5)
+        # self.object_detection_pub_topic     = rospy.get_param('~object_detection_topic', '/objects')
+        self.object_detection_pub_pose_topic = rospy.get_param('~object_detection_pose_topic', '~object_poses')
+        self.object_detection_pub_img_topic = rospy.get_param('~object_detection_output_image_topic', '~detections_in_image')
+        self.object_detection_pub_pts_topic = rospy.get_param('~object_detection_point_clouds_topic', '~detection_point_clouds')
+        self.object_detection_info_topic    = rospy.get_param('~object_detection_info_topic', '~detection_info')
+
+        # self.object_detection_pub           = rospy.Publisher(self.object_detection_pub_topic , ObjectDetectionArray, queue_size=1)
+        self.object_pose_pub                = rospy.Publisher(self.object_detection_pub_pose_topic , PoseArray, queue_size=1)
+        self.object_detection_img_pub       = rospy.Publisher(self.object_detection_pub_img_topic , Image, queue_size=1)
+        self.object_point_clouds_pub        = rospy.Publisher(self.object_detection_pub_pts_topic , PointCloudArray, queue_size=1)
+        self.detection_info_pub             = rospy.Publisher(self.object_detection_info_topic , ObjectDetectionInfoArray, queue_size=1)
         self.seq                            = 0
         
         # -> Topic Synchronization
@@ -56,7 +78,7 @@ class Node:
                                                                                self.camera_lidar_sync_slop)
         
         # ---------- Config Directory ----------
-        self.config_dir                     = rospy.get_param('~config_dir', None)
+        self.config_dir                     = join(self.rospack.get_path('object_detection'),'cfg')
 
         # ---------- Point Projector Related ---------- 
         self.project_cfg                  = rospy.get_param('~project_config', None)
@@ -65,6 +87,7 @@ class Node:
         self.objectdetector_cfg = {
             "architecture"      :  rospy.get_param('~architecture', 'yolo'),
             "model"             :  rospy.get_param('~model', 'yolov5n6').lower(),
+            "model_path"        :  rospy.get_param('~model_path', ''),
             "device"            :  rospy.get_param('~device', 'cpu'),
             "confident"         :  rospy.get_param('~confident', '0.4'),
             "iou"               :  rospy.get_param('~iou', '0.1'),
@@ -72,6 +95,8 @@ class Node:
             "classes"           :  rospy.get_param('~classes', None),
             "multiple_instance" :  rospy.get_param('~multiple_instance', False)
         }
+
+        print("cfg device: ", self.objectdetector_cfg["device"])
 
         # ---------- 3D Object Localizer Related ----------
         self.objectlocalizer_cfg = {
@@ -91,11 +116,15 @@ class Node:
         self.objectdetector                 = ObjectDetector( self.objectdetector_cfg )           
         self.objectlocalizer                = ObjectLocalizer( self.objectlocalizer_cfg, self.config_dir )
         
+        
         rospy.loginfo("[ObjectDetection Node] Object Detector initilization done.")
         rospy.loginfo("[ObjectDetection Node] Waiting for image info ...")
+        rospy.loginfo(f"[ObjectDetection Node] If this takes longer than a few seconds, make sure {self.camera_info_topic} is published.")
+        camera_info = rospy.wait_for_message(self.camera_info_topic , CameraInfo)
+        self.image_info_callback(camera_info)
 
     def image_info_callback(self, camera_info):
-        self.optical_frame_id  = camera_info.header.frame_id
+        self.optical_frame_id  = camera_info.header.frame_id # "blackfly_right_optical_link" 
         h                      = camera_info.height
         w                      = camera_info.width
         K                      = np.array(camera_info.K, dtype=np.float64).reshape(3,3)
@@ -108,17 +137,13 @@ class Node:
             rospy.sleep(1)
             self.seq = 0
             self.image_info_recieved = True
-            self.camera_info_sub.unregister()
         else:
-            if self.seq > 20:
-                rospy.logerr("[ObjectDetection Node] Image info could not be set after 20th try! Please check image info!")
-                rospy.signal_shutdown("Image info missing!")
-            rospy.loginfo("[ObjectDetection Node] Image info is not set! Trying again after 1 sec!")
-            rospy.sleep(1)
+            rospy.logerr(" ------------------ camera_info not valid ------------------------")
 
     def run(self):
 
         def callback(image_msg, lidar_msg):
+            callback_start = time.time()
             # If Image and Lidar messages are not empty
             if not image_msg.height > 0:
                 rospy.logfatal("[ObjectDetection Node] Image message is empty. Object detecion is on hold.")
@@ -128,7 +153,7 @@ class Node:
             if self.image_info_recieved and image_msg.height > 0 and lidar_msg.width > 0:
                 
                 # Read lidar message
-                point_cloud_XYZ = pointcloud2_to_xyzi(lidar_msg)
+                point_cloud_XYZ = ros_numpy.point_cloud2.pointcloud2_to_xyz_array(lidar_msg)
 
                 # Ground filter 
                 # Upward direction is Z which 3rd column in the matrix
@@ -139,70 +164,97 @@ class Node:
                 point_cloud_XYZ[:,:3] = self.pointprojector.transform_points(point_cloud_XYZ[:,:3])
                 pointcloud_on_image , in_FoV_indices = self.pointprojector.project_points_on_image(point_cloud_XYZ[:,:3])
 
+
                 # transform the image msg to numpy array
                 cv_image = self.imagereader.imgmsg_to_cv2(image_msg, "bgr8")
 
                 # Detect objects in image
                 object_detection_result, object_detection_image = self.objectdetector.detect(cv_image)
-                
+
                 # Localize every detected object
                 object_list = self.objectlocalizer.localize(object_detection_result, \
                                                             pointcloud_on_image, \
                                                             point_cloud_XYZ[in_FoV_indices], \
                                                             cv_image  )
- 
-                # Create object detection message
-                object_detection_array = ObjectDetectionArray()
-                object_detection_array.header.stamp            = image_msg.header.stamp
-                object_detection_array.header.frame_id         = self.optical_frame_id
-                object_detection_array.header.seq              = self.seq
+                
+                header = Header()
+                header.stamp = image_msg.header.stamp
+                header.frame_id = self.optical_frame_id
+                header.seq = self.seq
                 self.seq = self.seq + 1 if self.seq < UINT32-1 else 0
 
+                object_pose_array = PoseArray()
+                object_pose_array.header = header
+                object_information_array = ObjectDetectionInfoArray()
+                object_information_array.header = header
+                point_cloud_array = PointCloudArray()
+                point_cloud_array.header = header
+                 
+                pointcloud_in_FoV = point_cloud_XYZ[in_FoV_indices]
+                                                                                
                 # For every detected image object, fill the message object. 
                 for i in range(len(object_detection_result)):
-                    object_detection = ObjectDetection()
+                    object_pose = Pose()
+                    object_information = ObjectDetectionInfo()
+                    object_point_cloud = PointCloud2()
 
-                    object_detection.class_id = object_detection_result["name"][i]
-                    object_detection.id       = object_list[i].id
+                    object_information.class_id = object_detection_result["name"][i]
+                    object_pose.position.x = object_list[i].pos[0]
+                    object_pose.position.y = object_list[i].pos[1]
+                    object_pose.position.z = object_list[i].pos[2]
+                    object_pose.orientation = Quaternion(0,0,0,1)
 
-                    object_detection.pose_estimation_type = object_list[i].estimation_type 
+                    object_information.position.x = object_list[i].pos[0]
+                    object_information.position.y = object_list[i].pos[1]
+                    object_information.position.z = object_list[i].pos[2]
+                    object_information.id       = object_list[i].id
+                    object_information.pose_estimation_type = object_list[i].estimation_type
+                    object_information.confidence = object_detection_result["confidence"][i]
 
-                    object_detection.pose.x = object_list[i].pos[0]
-                    object_detection.pose.y = object_list[i].pos[1]
-                    object_detection.pose.z = object_list[i].pos[2]
+                    object_information.bounding_box_min_x = int(object_detection_result['xmin'][i])
+                    object_information.bounding_box_min_y = int(object_detection_result['ymin'][i])
+                    object_information.bounding_box_max_x = int(object_detection_result['xmax'][i])
+                    object_information.bounding_box_max_y = int(object_detection_result['ymax'][i])
 
-                    if self.verbose:
-                        object_detection.bounding_box_min_x = int(object_detection_result['xmin'][i])
-                        object_detection.bounding_box_min_y = int(object_detection_result['ymin'][i])
-                        object_detection.bounding_box_max_x = int(object_detection_result['xmax'][i])
-                        object_detection.bounding_box_max_y = int(object_detection_result['ymax'][i])
+                    object_point_cloud = pointcloud_in_FoV[object_list[i].pt_indices,:]
+                    object_point_cloud_msg = ros_numpy.point_cloud2.array_to_pointcloud2(unstructured_to_structured(object_point_cloud, 
+                                                                dtype = np.dtype( [('x', np.float32), ('y', np.float32), ('z', np.float32)] )))
 
-                        object_detection.on_object_point_indices = list(object_list[i].pt_indices) 
-                        
-                    object_detection_array.detections.append(object_detection)
+                    if (not self.project_all_points_to_img) and self.project_object_points_to_img:
+                        for idx, pt in enumerate(pointcloud_on_image[object_list[i].pt_indices,:]):
+                            dist = object_point_cloud[idx,2]
+                            color = depth_color(dist, min_d=0.5, max_d=20)
+                            try:
+                                cv2.circle(object_detection_image, pt[:2].astype(np.int32), 2, color, -1 )
+                            except:
+                                print("Cannot Circle \n")    
 
-                # Only if verbose true
-                if self.verbose:
-                    # Convert arrays to correct format
-                    pointcloud_on_image = np.c_[ pointcloud_on_image, np.zeros(pointcloud_on_image.shape[0]) ]
-                    pointcloud_on_image = unstructured_to_structured( pointcloud_on_image, dtype = np.dtype( [('x', np.float32), ('y', np.float32), ('z', np.float32)] ))
-                    pointcloud_in_FoV   = unstructured_to_structured( point_cloud_XYZ[in_FoV_indices], dtype = np.dtype( [('x', np.float32), ('y', np.float32), ('z', np.float32), ('i', np.float32)] ))
-                    # Create verbose message fields
-                    object_detection_array.detections_image        = self.imagereader.cv2_to_imgmsg(object_detection_image, 'bgr8')
-                    object_detection_array.pointcloud_in_frame_2D  = ros_numpy.point_cloud2.array_to_pointcloud2(pointcloud_on_image) 
-                    object_detection_array.pointcloud_in_frame_3D  = ros_numpy.point_cloud2.array_to_pointcloud2(pointcloud_in_FoV) 
+                    object_pose_array.poses.append(object_pose)
+                    object_information_array.info.append(object_information)
+                    point_cloud_array.point_clouds.append(object_point_cloud_msg)
+
+                if self.project_all_points_to_img:
+                    for idx, pt in enumerate(pointcloud_on_image): 
+                        dist = pointcloud_in_FoV[idx,2]
+                        color = depth_color(dist, min_d=0.5, max_d=30)
+                        try:
+                            cv2.circle(object_detection_image, pt[:2].astype(np.int32), 3, color, -1)
+                        except:
+                            print("Cannot Circle \n")    
 
                 # Publish the message
-                self.object_detection_pub.publish(object_detection_array)
+                self.object_pose_pub.publish(object_pose_array)
+                self.detection_info_pub.publish(object_information_array)
+                self.object_point_clouds_pub.publish(point_cloud_array)
+                self.object_detection_img_pub.publish(self.imagereader.cv2_to_imgmsg(object_detection_image, 'bgr8'))
+                
 
-        self.camera_info_sub = rospy.Subscriber(self.camera_info_topic , CameraInfo, self.image_info_callback)
         self.synchronizer.registerCallback(callback)
 
         rospy.spin()
 
 if __name__ == '__main__':
-
     node = Node()
     rospy.loginfo("[ObjectDetection Node] Detection has started")
     node.run()
-    
+
