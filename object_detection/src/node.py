@@ -124,7 +124,7 @@ class Node:
         self.image_info_callback(camera_info)
 
     def image_info_callback(self, camera_info):
-        self.optical_frame_id  = "blackfly_right_optical_link" #camera_info.header.frame_id # change this back when included in camera info
+        self.optical_frame_id  = camera_info.header.frame_id # "blackfly_right_optical_link" 
         h                      = camera_info.height
         w                      = camera_info.width
         K                      = np.array(camera_info.K, dtype=np.float64).reshape(3,3)
