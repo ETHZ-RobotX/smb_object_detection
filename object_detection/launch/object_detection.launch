@@ -24,7 +24,7 @@
         doc="Debayer the images (supplied in $input_camera_name/image_raw)."/>
 
   <arg  name="lidar_topic" 
-        default='/rslidar_points'
+        default='/rslidar/points'
         doc="Topic containing the point cloud from the lidar."/>
 
   <arg  name="object_detection_classes" 

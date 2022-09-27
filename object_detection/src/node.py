@@ -48,9 +48,9 @@ class Node:
 
         # ---------- Node Related Params ---------- 
         # -> Subscribed Topics
-        self.camera_topic                   = rospy.get_param('~camera_topic', '/versavis/cam0/undistorted')
-        self.camera_info_topic              = rospy.get_param('~camera_info_topic', '/versavis/cam0/camera_info')
-        self.lidar_topic                    = rospy.get_param('~lidar_topic', '/rslidar_points')                      
+        self.camera_topic                   = rospy.get_param('~camera_topic', '/visual_inertial_sensor/cam0/undistorted')
+        self.camera_info_topic              = rospy.get_param('~camera_info_topic', '/visual_inertial_sensor/cam0/camera_info')
+        self.lidar_topic                    = rospy.get_param('~lidar_topic', '/rslidar/points')                      
 
         # -> Published Topics
         # self.object_detection_pub_topic     = rospy.get_param('~object_detection_topic', '/objects')
@@ -124,7 +124,7 @@ class Node:
         self.image_info_callback(camera_info)
 
     def image_info_callback(self, camera_info):
-        self.optical_frame_id  = camera_info.header.frame_id # "blackfly_right_optical_link" 
+        self.optical_frame_id  = camera_info.header.frame_id # "rgbcamera_right_optical_link" 
         h                      = camera_info.height
         w                      = camera_info.width
         K                      = np.array(camera_info.K, dtype=np.float64).reshape(3,3)

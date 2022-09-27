@@ -7,7 +7,7 @@
         doc="Run on GPU? Options: 'local', 'remote', 'off' (default)"/>
 
   <arg  name="input_camera_name" 
-        default="/versavis/cam0" 
+        default="/visual_inertial_sensor/cam0" 
         doc="Name of the camera, i.e. topic prefix. Relevant for topic subscriptions."/>
 
   <node name="image_dropper" type="drop" pkg="topic_tools" args="$(arg input_camera_name)/image_raw 19 20 $(arg input_camera_name)/slow/image_raw" />
