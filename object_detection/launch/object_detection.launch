@@ -16,7 +16,7 @@
         doc="Username to use on the jetson xavier GPU"/>
 
   <arg  name="input_camera_name" 
-        default="/versavis/cam0/slow" 
+        default="/rgb_camera" 
         doc="Name of the camera, i.e. topic prefix. Relevant for topic subscriptions."/>
 
   <arg  name="debayer_image" 
@@ -28,7 +28,7 @@
         doc="Topic containing the point cloud from the lidar."/>
 
   <arg  name="object_detection_classes" 
-        default="[0,1,11,25,13,74]"
+        default="[0,24, 25, 28, 32, 39, 41, 45, 46, 47, 56]"
         doc=  "List of the ids of classes for detection. Based on the COCO dataset, refer here: https://github.com/ethz-asl/darknet_catkin/blob/master/data/coco.names. bNOTICE, class ids start at 0."/>
 
   <!-- evaluate where to run object detection node (based on argument gpu) -->
