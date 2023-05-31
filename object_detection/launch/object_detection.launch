@@ -31,6 +31,14 @@
         default="[0,24, 25, 28, 32, 39, 41, 45, 46, 47, 56]"
         doc=  "List of the ids of classes for detection. Based on the COCO dataset, refer here: https://github.com/ethz-asl/darknet_catkin/blob/master/data/coco.names. NOTICE, class ids start at 0."/>
 
+  <arg  name="model_dir_path" 
+        default="/usr/share/yolo/models"
+        doc=  "path to the yolo model directory"/>
+
+  <arg  name="model" 
+        default="yolov5l6"
+        doc=  "yolo model name"/>
+
   <!-- evaluate where to run object detection node (based on argument gpu) -->
   <arg name="object_detection_host" value="" unless="$(eval arg('gpu')=='remote')" />
   <arg name="object_detection_host" value="jetson" if="$(eval arg('gpu')=='remote')" />
@@ -69,8 +77,8 @@
     <param name="project_config" value='projector_config_$(arg smb_name).yaml'/>
 
     <!--Object detection related-->
-    <param name="model" value='yolov5l6'/>
-    <param name="model_path" value='/usr/share/yolo/models'/>
+    <param name="model" value='$(arg model)'/>
+    <param name="model_dir_path" value="$(arg model_dir_path)" />
     <!-- <param name="model_path" value=''/> -->
     <param name="device" value='$(arg object_detection_device)'/>
     <!-- <param name="device" value='cpu'/> -->

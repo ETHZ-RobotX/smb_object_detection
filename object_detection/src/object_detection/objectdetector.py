@@ -1,5 +1,6 @@
 import torch
 import numpy as np
+import os
 
 # from detectron2 import model_zoo
 # from detectron2.engine import DefaultPredictor
@@ -16,7 +17,7 @@ class ObjectDetector:
 
         self.architecture       = config["architecture"]
         self.model              = config["model"]
-        self.model_path         = config["model_path"]
+        self.model_dir_path     = config["model_dir_path"]
         self.checkpoint         = config["checkpoint"]
         self.device             = config["device"]
         self.confident          = config["confident"]
@@ -26,11 +27,11 @@ class ObjectDetector:
         self.detector           = None
 
         if self.architecture == 'yolo':
-            if self.model_path:
-                print("Path: ", self.model_path + self.model + ".pt")
+            if self.model_dir_path:
+                print("Path: ", os.path.join(self.model_dir_path , self.model + ".pt"))
                 print("Device: ", self.device)
                 device = select_device(self.device)
-                self.detector = DetectMultiBackend(self.model_path + "/" + self.model + ".pt", device=device)
+                self.detector = DetectMultiBackend(os.path.join(self.model_dir_path , self.model + ".pt"), device=device)
                 self.detector = AutoShape(self.detector)
                 self.detector = self.detector.to(device)
             else:
