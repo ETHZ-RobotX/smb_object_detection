@@ -48,8 +48,8 @@ class Node:
 
         # ---------- Node Related Params ---------- 
         # -> Subscribed Topics
-        self.camera_topic                   = rospy.get_param('~camera_topic', '/visual_inertial_sensor/cam0/undistorted')
-        self.camera_info_topic              = rospy.get_param('~camera_info_topic', '/visual_inertial_sensor/cam0/camera_info')
+        self.camera_topic                   = rospy.get_param('~camera_topic', '/rgb_camera/undistorted')
+        self.camera_info_topic              = rospy.get_param('~camera_info_topic', '/rgb_camera/camera_info')
         self.lidar_topic                    = rospy.get_param('~lidar_topic', '/rslidar/points')                      
 
         # -> Published Topics
