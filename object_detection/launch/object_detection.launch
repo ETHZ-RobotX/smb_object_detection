@@ -16,20 +16,28 @@
         doc="Username to use on the jetson xavier GPU"/>
 
   <arg  name="input_camera_name" 
-        default="/rgb_camera" 
-        doc="Name of the camera, i.e. topic prefix. Relevant for topic subscriptions."/>
+        default="/rgb_camera"
+        doc="Name of the camera, i.e. topic prefix for camera stream and camera info. Relevant for topic subscriptions."/>
 
   <arg  name="debayer_image" 
-        default="false" 
+        default="false"
         doc="Debayer the images (supplied in $input_camera_name/image_raw)."/>
 
   <arg  name="lidar_topic" 
-        default='/rslidar_points'
+        default='/rslidar/points'
         doc="Topic containing the point cloud from the lidar."/>
 
   <arg  name="object_detection_classes" 
         default="[0,24, 25, 28, 32, 39, 41, 45, 46, 47, 56]"
         doc=  "List of the ids of classes for detection. Based on the COCO dataset, refer here: https://github.com/ethz-asl/darknet_catkin/blob/master/data/coco.names. NOTICE, class ids start at 0."/>
+
+  <arg  name="model_dir_path" 
+        default="/usr/share/yolo/models"
+        doc=  "path to the yolo model directory"/>
+
+  <arg  name="model" 
+        default="yolov5l6"
+        doc=  "yolo model name"/>
 
   <!-- evaluate where to run object detection node (based on argument gpu) -->
   <arg name="object_detection_host" value="" unless="$(eval arg('gpu')=='remote')" />
@@ -54,7 +62,7 @@
 
   <node machine="$(arg object_detection_host)" name="object_detector" pkg="object_detection" type="node.py" output="screen">
     <!--Input related-->
-    <param name="camera_topic" value='$(arg input_camera_name)/image_color'/>
+    <param name="camera_topic" value='$(arg input_camera_name)/image_raw'/>
     <param name="camera_info_topic" value='$(arg input_camera_name)/camera_info'/>
     <param name="lidar_topic" value='$(arg lidar_topic)'/>
 
@@ -69,14 +77,13 @@
     <param name="project_config" value='projector_config_$(arg smb_name).yaml'/>
 
     <!--Object detection related-->
-    <param name="model" value='yolov5l6'/>
-    <param name="model_path" value='/usr/share/yolo/models'/>
-    <!-- <param name="model_path" value=''/> -->
+    <param name="model" value='$(arg model)'/>
+    <param name="model_dir_path" value="$(arg model_dir_path)" />
     <param name="device" value='$(arg object_detection_device)'/>
     <!-- <param name="device" value='cpu'/> -->
     <param name="confident" value='0.4'/>
     <param name="iou" value='0.1'/>
-    <rosparam param="classes" subst_value="True">$(arg object_detection_classes)</rosparam> >
+    <rosparam param="classes" subst_value="True">$(arg object_detection_classes)</rosparam>
     <param name="multiple_instance" value='False'/>
 
     <!--Object localization related-->

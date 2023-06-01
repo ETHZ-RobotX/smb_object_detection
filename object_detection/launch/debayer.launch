@@ -1,6 +1,6 @@
 <launch>
   <arg name="input_camera_name"
-       default="/versavis/cam0/slow"
+       default="/rgb_camera"
        doc="Namespace of the camera/image stream that should be debayerd" />
 
   <node pkg="nodelet" type="nodelet" name="debayer"

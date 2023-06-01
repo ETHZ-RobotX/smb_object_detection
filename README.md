@@ -17,7 +17,7 @@ pip install -r requirements.txt
 ### Loading Detection Model From Local Repository
 By default, a pretrained yolov5 model is used for object detection. This model can be loaded from an online repository, however, it is often convenient to load the model from a local directory. To do so, download a model from the [release page](https://github.com/ultralytics/yolov5/releases)
 
-Then ensure that the ROS parameter `model_path` points to the directory where the model is stored and that `model` reflects the name of the model, e.g. `yolov5l6`.  For more information on the different available launch parameters see [below](#launching-and-parameters)
+Then ensure that the ROS parameter `model_dir_path` points to the directory where the model is stored and that `model` reflects the name of the model, e.g. `yolov5l6`.  For more information on the different available launch parameters see [below](#launching-and-parameters)
 
 ## Launching and Parameters
 
@@ -35,10 +35,10 @@ The default setup assumes lauching the pipeline on a remote NVIDIA Jetson. For a
 | gpu                          | remote                                                | Whether to utilize GPU. Can be set 'local' to run on the GPU of the local machine (this may require additional setup of CUDA libraries), 'remote' to run on the NVIDIA Jetson GPU, or 'off' to run on the CPU of the local machine. For debugging, 'off' is the best option. |
 | GPU_user                     | $(env USER)                                           | Username to use on the NVIDIA Jetson GPU |
 | debayer_image                | true                                                  | Whether to debayer images. If this is set to false, `camera_topic` and `camera_info_topic` probably needs to be changed. |
-| input_camera_name            | /versavis/cam0/slow                                   | Input camera name. The exact topics needed are inferred based on the camera name. By default refers to a temporally downsampled image stream.|
-| camera_topic                 | $(arg input_camera_name)/image_color                  | The topic of the images to detect objects in. |
+| input_camera_name            | /rgb_camera                                           | Input camera name. The exact topics needed are inferred based on the camera name. By default refers to a temporally downsampled image stream.|
+| camera_topic                 | $(arg input_camera_name)/image_raw                    | The topic of the images to detect objects in. |
 | camera_info_topic            | $(arg input_camera_name)/camera_info                  | The topic of the camera info, containing the camera calibration parameters. Used once during initialization. |
-| lidar_topic                  | /rslidar_points                                       | Lidar mesage topic name                |
+| lidar_topic                  | /rslidar/points                                       | Lidar mesage topic name                |
 | camera_lidar_sync_queue_size | 10                                                    | How many frame should be searched to find appropiate time stamp. Please refer [here](http://wiki.ros.org/message_filters#ApproximateTime_Policy).|
 | camera_lidar_sync_slop       | 0.1                                                   | The maximim time difference between syncronized topics. In real-time usage it might be large due to the fact that sensors start running at different time. Please refer [here](http://wiki.ros.org/message_filters#ApproximateTime_Policy).|
 | model_path                   | /usr/share/yolo/models                                | The path to the directory containing the local yolov5 model. If left empty, `''`, the model will be loaded from the online repository.|
@@ -81,4 +81,4 @@ Apart from the above parameters, the following parameters are available in `outp
 If the z axis of a detected object is -1, the object is not correctly localized. This happens if an object is detected by the camera but there are not enough Lidar points/measurement inside the bounding box of it.
 
 ## Launch Using Rosbag
-The launch folder contains a launch file for testing the pipline based on a provided rosbag. Apart from launching the detection node and playing the rosbag, it also launches an RViz window with useful visualisation of relevant topics. Currently the existing rosbag has slightly different outputs than on the newest setup of the camera. To compensate for this, the rosbag launch file contains a topic dropper node to create the `/versavis/cam0/slow` topics.
+The launch folder contains a launch file for testing the pipline based on a provided rosbag. Apart from launching the detection node and playing the rosbag, it also launches an RViz window with useful visualisation of relevant topics.
