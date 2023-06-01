@@ -87,7 +87,7 @@ class Node:
         self.objectdetector_cfg = {
             "architecture"      :  rospy.get_param('~architecture', 'yolo'),
             "model"             :  rospy.get_param('~model', 'yolov5n6').lower(),
-            "model_path"        :  rospy.get_param('~model_path', ''),
+            "model_dir_path"    :  rospy.get_param('~model_dir_path', ''),
             "device"            :  rospy.get_param('~device', 'cpu'),
             "confident"         :  rospy.get_param('~confident', '0.4'),
             "iou"               :  rospy.get_param('~iou', '0.1'),

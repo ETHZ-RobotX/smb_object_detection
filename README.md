@@ -17,7 +17,7 @@ pip install -r requirements.txt
 ### Loading Detection Model From Local Repository
 By default, a pretrained yolov5 model is used for object detection. This model can be loaded from an online repository, however, it is often convenient to load the model from a local directory. To do so, download a model from the [release page](https://github.com/ultralytics/yolov5/releases)
 
-Then ensure that the ROS parameter `model_path` points to the directory where the model is stored and that `model` reflects the name of the model, e.g. `yolov5l6`.  For more information on the different available launch parameters see [below](#launching-and-parameters)
+Then ensure that the ROS parameter `model_dir_path` points to the directory where the model is stored and that `model` reflects the name of the model, e.g. `yolov5l6`.  For more information on the different available launch parameters see [below](#launching-and-parameters)
 
 ## Launching and Parameters
 

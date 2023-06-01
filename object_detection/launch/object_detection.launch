@@ -79,7 +79,6 @@
     <!--Object detection related-->
     <param name="model" value='$(arg model)'/>
     <param name="model_dir_path" value="$(arg model_dir_path)" />
-    <!-- <param name="model_path" value=''/> -->
     <param name="device" value='$(arg object_detection_device)'/>
     <!-- <param name="device" value='cpu'/> -->
     <param name="confident" value='0.4'/>
