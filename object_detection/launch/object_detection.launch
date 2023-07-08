@@ -8,7 +8,7 @@
         doc="Name of the SMB in the format smb26x (relevant for calibrations)"/>
 
   <arg  name="gpu" 
-        default="remote"
+        default="off"
         doc="Run on GPU? Options: 'local', 'remote' (default), 'off'"/>
 
   <arg  name="GPU_user" 
@@ -36,7 +36,7 @@
         doc=  "path to the yolo model directory"/>
 
   <arg  name="model" 
-        default="yolov5l6"
+        default="yolov5m6"
         doc=  "yolo model name"/>
 
   <!-- evaluate where to run object detection node (based on argument gpu) -->
@@ -92,3 +92,4 @@
     <param name="bb_contract_percentage" value='10.0'/>
   </node>
 </launch>
+
