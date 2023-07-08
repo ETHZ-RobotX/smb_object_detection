@@ -12,7 +12,7 @@
         doc="Run on GPU? Options: 'local', 'remote' (default), 'off'"/>
 
   <arg  name="GPU_user" 
-        default="$(env USER)"
+        default="$(optenv USER)"
         doc="Username to use on the jetson xavier GPU"/>
 
   <arg  name="input_camera_name" 
