@@ -91,4 +91,7 @@
     <param name="ground_percentage" value='25'/>
     <param name="bb_contract_percentage" value='10.0'/>
   </node>
+
+  <node name="object_detection_logger" pkg="object_detection_logger" type="ObjectDetectionLogger.py" output="screen"/>  
+
 </launch>
