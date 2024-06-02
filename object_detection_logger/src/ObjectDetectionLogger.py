@@ -27,7 +27,7 @@ class ObjectDetectionLogger:
         # List to store logged detections
         self.logged_detections = []
 
-    def is_within_radius(self, pos1, pos2, radius=2.0):
+    def is_within_radius(self, pos1, pos2, radius=5.0):
         # Calculate the Euclidean distance between two points
         distance = math.sqrt((pos1.x - pos2.x)**2 + (pos1.y - pos2.y)**2 + (pos1.z - pos2.z)**2)
         return distance <= radius
