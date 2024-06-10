@@ -20,7 +20,7 @@ from std_msgs.msg import Header
 
 from geometry_msgs.msg import PoseArray, Pose, Quaternion
 
-from object_detection.objectdetector    import ObjectDetector
+from object_detection.objectdetectorONNX    import ObjectDetectorONNX 
 from object_detection.pointprojector    import PointProjector
 from object_detection.objectlocalizer   import ObjectLocalizer
 from object_detection.utils             import *
@@ -113,7 +113,7 @@ class Node:
         # ---------- Objects of Actions ----------
         self.imagereader                    = CvBridge()
         self.pointprojector                 = PointProjector( join(self.config_dir, self.project_cfg))
-        self.objectdetector                 = ObjectDetector( self.objectdetector_cfg )           
+        self.objectdetector                 = ObjectDetectorONNX( self.objectdetector_cfg )           
         self.objectlocalizer                = ObjectLocalizer( self.objectlocalizer_cfg, self.config_dir )
         
         
