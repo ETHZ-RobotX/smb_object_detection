@@ -36,7 +36,7 @@
         doc=  "path to the yolo model directory"/>
 
   <arg  name="model" 
-        default="yolov5m6"
+        default="yolov5l6"
         doc=  "yolo model name"/>
 
   <!-- evaluate where to run object detection node (based on argument gpu) -->
@@ -92,4 +92,3 @@
     <param name="bb_contract_percentage" value='10.0'/>
   </node>
 </launch>
-
