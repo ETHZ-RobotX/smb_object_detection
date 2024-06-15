@@ -32,7 +32,7 @@ class ObjectDetectorONNX:
     
     def preprocess(self, image):
         # Maintain aspect ratio and pad the image to the required input size
-        input_size = 1280
+        input_size = 640
         h, w, _ = image.shape
         scale = min(input_size / h, input_size / w)
         nh, nw = int(h * scale), int(w * scale)
@@ -45,7 +45,7 @@ class ObjectDetectorONNX:
         
         image_padded = cv2.copyMakeBorder(image_resized, top, bottom, left, right, cv2.BORDER_CONSTANT, value=(114, 114, 114))
         
-        image_padded = image_padded.astype(np.float32) / 255.0
+        image_padded = image_padded.astype(np.float16) / 255.0
         image_padded = np.transpose(image_padded, (2, 0, 1))  # Change to (C, H, W)
         image_padded = np.expand_dims(image_padded, axis=0)  # Add batch dimension
         return image_padded, scale, top, left
