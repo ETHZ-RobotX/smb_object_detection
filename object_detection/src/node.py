@@ -144,6 +144,7 @@ class Node:
 
         def callback(image_msg, lidar_msg):
             callback_start = time.time()
+            rospy.loginfo_once('Got first image / pointcloud pair')
             # If Image and Lidar messages are not empty
             if not image_msg.height > 0:
                 rospy.logfatal("[ObjectDetection Node] Image message is empty. Object detecion is on hold.")
